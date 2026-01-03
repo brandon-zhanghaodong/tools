@@ -778,7 +778,7 @@ const AdminConsole = ({
   currentUser: User,
   orgId: string
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'users' | 'relations' | 'questions'>('relations');
+  const [activeSubTab, setActiveSubTab] = useState<'users' | 'relations' | 'questions'>('users');
   const [generatingRel, setGeneratingRel] = useState(false);
   const [generatingQ, setGeneratingQ] = useState(false);
   const [importText, setImportText] = useState('');
@@ -789,7 +789,7 @@ const AdminConsole = ({
   // User Management State
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456' });
+  const [newUser, setNewUser] = useState<Partial<User>>({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456', managerId: '' });
 
   // Relationship Filtering
   const [filterUserId, setFilterUserId] = useState<string>('');
@@ -1020,22 +1020,23 @@ const AdminConsole = ({
     if (!newUser.name || !newUser.username) return;
 
     if (editingUserId) {
-      setUsers(users.map(u => u.id === editingUserId ? { ...u, ...newUser } : u));
+      setUsers(users.map(u => u.id === editingUserId ? { ...u, ...newUser } as User : u));
     } else {
       const user: User = {
         id: `u-${Date.now()}`,
         organizationId: orgId,
-        name: newUser.name,
-        username: newUser.username,
+        name: newUser.name!,
+        username: newUser.username!,
         email: `${newUser.username}@${orgId}.com`,
         role: newUser.role as UserRole,
         department: newUser.department || 'General',
         password: newUser.password || '123456',
+        managerId: newUser.managerId,
         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.username}`
       };
       setUsers([...users, user]);
     }
-    setNewUser({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456' });
+    setNewUser({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456', managerId: '' });
     setEditingUserId(null);
     setShowAddUser(false);
   };
@@ -1071,7 +1072,8 @@ const AdminConsole = ({
       username: user.username,
       role: user.role,
       department: user.department,
-      password: user.password || '123456'
+      password: user.password || '123456',
+      managerId: user.managerId || ''
     });
     setEditingUserId(user.id);
     setShowAddUser(true);
@@ -1092,7 +1094,7 @@ const AdminConsole = ({
       </div>
 
       <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg w-fit">
-        {(['relations', 'questions', 'users'] as const).map(tab => (
+        {(['users', 'relations', 'questions'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveSubTab(tab)}
@@ -1102,8 +1104,8 @@ const AdminConsole = ({
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            {tab === 'users' && '用户管理'}
-            {tab === 'relations' && '准备评价者名单'}
+            {tab === 'users' && '用户管理 (User Management)'}
+            {tab === 'relations' && '考核关系配置 (Config)'}
             {tab === 'questions' && '测评试题开发'}
           </button>
         ))}
@@ -1111,14 +1113,18 @@ const AdminConsole = ({
 
       {activeSubTab === 'users' && (
         <Card className="p-6">
+           <InstructionAlert title="操作重要提示">
+              请在此维护企业完整的组织架构。<strong>务必正确设置每位员工的“直属上级”</strong>，系统后续将依据此信息自动生成“上级评价”和“下级评价”的考核关系。
+           </InstructionAlert>
+
            {/* Reuse existing UI logic but bind to handlers above */}
            <div className="flex flex-col gap-4 mb-6">
             <div className="flex justify-between items-center">
-               <h3 className="text-lg font-bold text-slate-800">用户列表</h3>
+               <h3 className="text-lg font-bold text-slate-800">人员名单管理</h3>
                <div className="flex gap-2">
                   <Button variant="primary" className="text-sm" onClick={() => {
                     setEditingUserId(null);
-                    setNewUser({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456' });
+                    setNewUser({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456', managerId: '' });
                     setShowAddUser(!showAddUser);
                   }}>
                     {showAddUser ? '取消' : '+ 添加用户'}
@@ -1139,20 +1145,51 @@ const AdminConsole = ({
           </div>
 
           {showAddUser && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <input placeholder="姓名" className="p-2 border rounded text-sm" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
-                <input placeholder="用户名" className="p-2 border rounded text-sm" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} />
-                <input placeholder="密码" className="p-2 border rounded text-sm" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
-                <input placeholder="部门" className="p-2 border rounded text-sm" value={newUser.department} onChange={e => setNewUser({...newUser, department: e.target.value})} />
-                <div className="flex gap-2">
-                   <select className="p-2 border rounded text-sm flex-1" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
-                     <option value={UserRole.EMPLOYEE}>员工</option>
-                     <option value={UserRole.MANAGER}>经理</option>
-                     <option value={UserRole.ADMIN}>管理员</option>
-                   </select>
-                   <Button onClick={handleSaveUser}>{editingUserId ? '更新' : '保存'}</Button>
+            <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in slide-in-from-top-2">
+               <h4 className="text-sm font-bold text-slate-700 mb-3">{editingUserId ? '编辑用户' : '新增用户'}</h4>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">姓名 <span className="text-red-500">*</span></label>
+                  <input placeholder="例如: 张三" className="w-full p-2 border rounded text-sm" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">登录用户名 <span className="text-red-500">*</span></label>
+                  <input placeholder="例如: zhangsan" className="w-full p-2 border rounded text-sm" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">初始密码</label>
+                  <input placeholder="默认: 123456" className="w-full p-2 border rounded text-sm" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">所属部门</label>
+                  <input placeholder="例如: 研发部" className="w-full p-2 border rounded text-sm" value={newUser.department} onChange={e => setNewUser({...newUser, department: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">系统角色</label>
+                  <select className="w-full p-2 border rounded text-sm" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
+                     <option value={UserRole.EMPLOYEE}>普通员工 (Employee)</option>
+                     <option value={UserRole.MANAGER}>部门经理 (Manager)</option>
+                     <option value={UserRole.ADMIN}>管理员 (Admin)</option>
+                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">直属上级 (Direct Manager)</label>
+                  <select 
+                    className="w-full p-2 border rounded text-sm bg-white" 
+                    value={newUser.managerId || ''} 
+                    onChange={e => setNewUser({...newUser, managerId: e.target.value})}
+                  >
+                     <option value="">-- 无 / 请选择 --</option>
+                     {users.filter(u => u.id !== editingUserId).map(u => (
+                       <option key={u.id} value={u.id}>{u.name} ({u.department})</option>
+                     ))}
+                   </select>
+                   <p className="text-[10px] text-slate-400 mt-1">设置上级有助于自动生成"下级评价上级"和"上级评价下级"的考核关系。</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t pt-3">
+                 <Button variant="secondary" onClick={() => setShowAddUser(false)}>取消</Button>
+                 <Button onClick={handleSaveUser}>{editingUserId ? '更新信息' : '确认保存'}</Button>
               </div>
             </div>
           )}
@@ -1161,31 +1198,54 @@ const AdminConsole = ({
             <table className="min-w-full divide-y divide-slate-200">
               <thead>
                 <tr className="bg-slate-50">
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">姓名</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">用户名</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">姓名 / 账号</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">部门 & 角色</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">直属上级 <span className="text-red-500">*</span></th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">密码</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">角色</th>
-                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">部门</th>
                   <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {users.map(u => (
-                  <tr key={u.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{u.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.username}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500"><code className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono text-xs">{u.password || '123456'}</code></td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500"><Badge>{u.role}</Badge></td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.department}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button onClick={() => handleResetPassword(u.id)} className="text-yellow-600 hover:text-yellow-800 p-1" title="重置密码"><Icons.Refresh /></button>
-                        <button onClick={() => startEditUser(u)} className="text-blue-600 hover:text-blue-900 p-1" title="编辑用户"><Icons.Edit /></button>
-                        <button onClick={() => handleDeleteUser(u.id)} className="text-red-600 hover:text-red-900 p-1" title="删除用户及相关记录"><Icons.Trash /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {users.map(u => {
+                  const manager = users.find(m => m.id === u.managerId);
+                  return (
+                    <tr key={u.id} className="hover:bg-slate-50 group">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8">
+                            <img className="h-8 w-8 rounded-full bg-slate-200" src={u.avatarUrl} alt="" />
+                          </div>
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-slate-900">{u.name}</div>
+                            <div className="text-xs text-slate-500">@{u.username}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-900">{u.department}</div>
+                        <Badge color={u.role === 'ADMIN' ? 'red' : u.role === 'MANAGER' ? 'blue' : 'gray'}>{u.role}</Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                        {manager ? (
+                          <span className="flex items-center text-slate-700">
+                            <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
+                            {manager.name}
+                          </span>
+                        ) : <span className="text-red-400 italic text-xs border border-red-200 bg-red-50 px-2 py-1 rounded">未设置</span>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                        <code className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono text-xs">{u.password || '123456'}</code>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => handleResetPassword(u.id)} className="text-yellow-600 hover:text-yellow-800 p-1" title="重置密码"><Icons.Refresh /></button>
+                          <button onClick={() => startEditUser(u)} className="text-blue-600 hover:text-blue-900 p-1" title="编辑用户"><Icons.Edit /></button>
+                          <button onClick={() => handleDeleteUser(u.id)} className="text-red-600 hover:text-red-900 p-1" title="删除用户"><Icons.Trash /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -1195,15 +1255,21 @@ const AdminConsole = ({
       {activeSubTab === 'relations' && (
         <div className="space-y-6">
            <Card className="p-6 bg-gradient-to-r from-blue-50 to-white border-blue-100">
-             {/* Import UI reusing handleImportOrgChart */}
+             <div className="mb-4">
+                <h3 className="text-lg font-bold text-slate-800">智能生成考核关系</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  系统将根据【用户管理】中设定的部门和直属上级关系，自动生成 360° 评价任务（包含自评、上级评价、下级评价及同事互评）。
+                </p>
+             </div>
              <div className="space-y-4">
                 <div className="flex gap-3 pt-2">
                   <div className="relative overflow-hidden inline-block">
-                     <Button variant="primary"><Icons.Upload /> <span className="ml-2">上传架构图/花名册</span></Button>
+                     <Button variant="primary"><Icons.Upload /> <span className="ml-2">上传架构图 (AI 辅助)</span></Button>
                      <input id="orgChartFile" type="file" className="absolute top-0 left-0 opacity-0 w-full h-full cursor-pointer" onChange={handleImportOrgChart} />
                   </div>
                   <Button onClick={handleGenerateRelationships} isLoading={generatingRel} variant="secondary">一键生成关系</Button>
                 </div>
+                <p className="text-xs text-slate-400">提示：如果您已在“用户管理”中完善了汇报关系，直接点击“一键生成”即可。</p>
              </div>
            </Card>
            <Card className="p-6">
@@ -1226,9 +1292,9 @@ const AdminConsole = ({
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="sticky top-0 bg-white z-10 shadow-sm">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">被考核人</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">考核人</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">关系</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">被考核人 (Subject)</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">考核人 (Reviewer)</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">关系类型</th>
                     <th className="px-6 py-3 text-right text-xs font-bold text-slate-500">操作</th>
                   </tr>
                 </thead>
@@ -1238,8 +1304,12 @@ const AdminConsole = ({
                      const reviewer = users.find(u => u.id === a.reviewerId);
                      return (
                       <tr key={a.id} className="hover:bg-slate-50">
-                        <td className="px-6 py-3 text-sm">{subject?.name || a.subjectId}</td>
-                        <td className="px-6 py-3 text-sm">{reviewer?.name || a.reviewerId}</td>
+                        <td className="px-6 py-3 text-sm">
+                          <span className="font-medium text-slate-900">{subject?.name || a.subjectId}</span>
+                        </td>
+                        <td className="px-6 py-3 text-sm">
+                          <span className="text-slate-600">{reviewer?.name || a.reviewerId}</span>
+                        </td>
                         <td className="px-6 py-3 text-sm"><Badge>{a.relationship}</Badge></td>
                         <td className="px-6 py-3 text-right">
                           <button 
@@ -1329,294 +1399,216 @@ const AdminConsole = ({
 }
 
 const App = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('nexus_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  // Global State (Mock Database with Persistence)
-  // We initialize from localStorage if available, otherwise use MOCK data.
-  // We also add useEffects to persist changes.
-  
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('nexus_users');
-    return saved ? JSON.parse(saved) : MOCK_USERS;
-  });
-  
-  const [questions, setQuestions] = useState<Question[]>(() => {
-    const saved = localStorage.getItem('nexus_questions');
-    return saved ? JSON.parse(saved) : INITIAL_QUESTIONS;
-  });
-  
-  const [cycles, setCycles] = useState<ReviewCycle[]>(() => {
-    const saved = localStorage.getItem('nexus_cycles');
-    return saved ? JSON.parse(saved) : INITIAL_CYCLES;
-  });
-  
-  const [assignments, setAssignments] = useState<ReviewAssignment[]>(() => {
-    const saved = localStorage.getItem('nexus_assignments');
-    return saved ? JSON.parse(saved) : INITIAL_ASSIGNMENTS;
-  });
-  
-  const [orgs, setOrgs] = useState<Organization[]>(() => {
-    const saved = localStorage.getItem('nexus_orgs');
-    return saved ? JSON.parse(saved) : MOCK_ORGS;
-  });
-  
-  // --- Persistence Effects ---
-  useEffect(() => {
-    if (currentUser) localStorage.setItem('nexus_current_user', JSON.stringify(currentUser));
-    else localStorage.removeItem('nexus_current_user');
-  }, [currentUser]);
+  // Global Data State
+  const [orgs, setOrgs] = useState<Organization[]>(MOCK_ORGS);
+  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const [cycles, setCycles] = useState<ReviewCycle[]>(INITIAL_CYCLES);
+  const [assignments, setAssignments] = useState<ReviewAssignment[]>(INITIAL_ASSIGNMENTS);
+  const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
 
-  useEffect(() => localStorage.setItem('nexus_users', JSON.stringify(users)), [users]);
-  useEffect(() => localStorage.setItem('nexus_questions', JSON.stringify(questions)), [questions]);
-  useEffect(() => localStorage.setItem('nexus_cycles', JSON.stringify(cycles)), [cycles]);
-  useEffect(() => localStorage.setItem('nexus_assignments', JSON.stringify(assignments)), [assignments]);
-  useEffect(() => localStorage.setItem('nexus_orgs', JSON.stringify(orgs)), [orgs]);
+  // Session State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-reviews' | 'team-reports' | 'admin'>('dashboard');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-  const [isChangePasswordOpen, setChangePasswordOpen] = useState(false);
-
-  // Derived State for Current Org
+  // Derived
   const currentOrg = useMemo(() => 
-    orgs.find(o => o.id === currentUser?.organizationId), 
-    [orgs, currentUser]
+    currentUser ? orgs.find(o => o.id === currentUser.organizationId) : null, 
+    [currentUser, orgs]
   );
   
-  const orgUsers = useMemo(() => 
-    users.filter(u => u.organizationId === currentUser?.organizationId),
-    [users, currentUser]
+  const currentCycle = useMemo(() => 
+    currentUser ? cycles.find(c => c.organizationId === currentUser.organizationId && c.status === 'ACTIVE') : null,
+    [currentUser, cycles]
   );
-  
-  const orgAssignments = useMemo(() => 
-    assignments.filter(a => a.organizationId === currentUser?.organizationId),
-    [assignments, currentUser]
-  );
-  
-  const orgQuestions = useMemo(() => 
-    questions.filter(q => !q.organizationId || q.organizationId === currentUser?.organizationId),
-    [questions, currentUser]
-  );
-  
-  const activeCycle = useMemo(() => {
-    if (!currentUser) return null;
-    return cycles.find(c => c.organizationId === currentUser.organizationId && c.status === 'ACTIVE')
-       || ({ id: 'dummy', organizationId: currentUser.organizationId, name: 'Default Cycle', status: 'ACTIVE', dueDate: '' } as ReviewCycle);
-  }, [cycles, currentUser]);
 
-  // Actions
-  const handleLogin = (orgCodeInput: string, u: string, p: string) => {
-    // Add trim() to handle copy-paste whitespace issues
-    const cleanInput = orgCodeInput.trim();
-    const cleanUser = u.trim();
-    const cleanPass = p.trim();
-
-    // Support Login by Code OR Name (Case Insensitive Match for Name)
-    const org = orgs.find(o => 
-      o.code === cleanInput || 
-      o.name.toLowerCase() === cleanInput.toLowerCase()
-    );
-
-    if (!org) { alert("企业代码或名称不存在"); return; }
-    
-    const user = users.find(user => user.organizationId === org.id && user.username === cleanUser && user.password === cleanPass);
-    if (user) {
-      setCurrentUser(user);
-      setActiveTab('dashboard');
-    } else {
-      alert("用户名或密码错误");
-    }
+  const handleLogin = (orgCode: string, u: string, p: string) => {
+     const org = orgs.find(o => o.code === orgCode);
+     if (!org) { setLoginError("找不到该企业代码"); return; }
+     
+     const user = users.find(user => user.organizationId === org.id && user.username === u);
+     if (!user) { setLoginError("用户不存在"); return; }
+     if (user.password !== p) { setLoginError("密码错误"); return; }
+     
+     setCurrentUser(user);
+     setLoginError(null);
+     setActiveTab('dashboard');
   };
 
   const handleRegister = (orgName: string, orgCode: string, adminName: string, adminUser: string, adminPass: string) => {
-    // Basic Validation
-    if (orgs.some(o => o.code === orgCode)) {
-      alert("该企业代码已被使用，请尝试其他代码。");
-      return;
-    }
+     if (orgs.some(o => o.code === orgCode)) { setLoginError("该企业代码已被占用"); return; }
+     
+     const newOrg: Organization = {
+        id: `org-${Date.now()}`,
+        name: orgName,
+        code: orgCode,
+        recoveryKey: generateRecoveryKey(),
+        createdAt: new Date().toISOString()
+     };
+     
+     const newAdmin: User = {
+        id: `u-${Date.now()}`,
+        organizationId: newOrg.id,
+        name: adminName,
+        username: adminUser,
+        password: adminPass,
+        email: `${adminUser}@${orgCode}.com`,
+        role: UserRole.ADMIN,
+        department: 'Management',
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${adminUser}`
+     };
+     
+     // Create default cycle
+     const newCycle: ReviewCycle = {
+        id: `c-${Date.now()}`,
+        organizationId: newOrg.id,
+        name: `${new Date().getFullYear()} Q1 Performance Review`,
+        status: 'ACTIVE',
+        dueDate: '2025-03-31'
+     };
 
-    const newOrgId = `org-${Date.now()}`;
-    const recoveryKey = generateRecoveryKey();
-    
-    const newOrg: Organization = {
-      id: newOrgId,
-      name: orgName,
-      code: orgCode,
-      recoveryKey: recoveryKey,
-      createdAt: new Date().toISOString()
-    };
-    
-    const newAdmin: User = {
-      id: `u-${Date.now()}`,
-      organizationId: newOrgId,
-      name: adminName,
-      username: adminUser,
-      password: adminPass,
-      email: `${adminUser}@${orgCode}.com`,
-      role: UserRole.ADMIN,
-      department: 'Management',
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${adminUser}`
-    };
-
-    const newCycle: ReviewCycle = {
-      id: `c-${Date.now()}`,
-      organizationId: newOrgId,
-      name: `${new Date().getFullYear()} Q1 Review`,
-      status: 'ACTIVE',
-      dueDate: '2025-12-31'
-    };
-
-    setOrgs(prev => [...prev, newOrg]);
-    setUsers(prev => [...prev, newAdmin]);
-    setCycles(prev => [...prev, newCycle]);
-    
-    alert(`注册成功！\n\n企业名称: ${orgName}\n登录代码: ${orgCode}\n恢复密钥: ${recoveryKey}\n\n请截图保存。`);
-    setCurrentUser(newAdmin);
-    setActiveTab('dashboard');
+     setOrgs([...orgs, newOrg]);
+     setUsers([...users, newAdmin]);
+     setCycles([...cycles, newCycle]);
+     
+     // Auto login
+     setCurrentUser(newAdmin);
+     alert(`注册成功！请保存您的恢复密钥: ${newOrg.recoveryKey}`);
   };
 
-  const handleRecover = (orgCode: string, recoveryKey: string, newPass: string) => {
-    const org = orgs.find(o => o.code === orgCode.trim());
-    if (!org) { alert("企业代码不存在"); return; }
-    
-    if (org.recoveryKey !== recoveryKey.trim()) {
-        alert("恢复密钥错误！");
-        return;
-    }
-
-    const adminUser = users.find(u => u.organizationId === org.id && u.role === UserRole.ADMIN);
-    if (!adminUser) {
-        alert("未找到该企业的管理员账户，请联系平台支持。");
-        return;
-    }
-
-    // Reset Password
-    setUsers(prev => prev.map(u => u.id === adminUser.id ? { ...u, password: newPass } : u));
-    alert(`恢复成功！\n\n管理员用户名: ${adminUser.username}\n新密码: 已设置\n\n请使用新凭证登录。`);
+  const handleRecover = (orgCode: string, key: string, newPass: string) => {
+     const org = orgs.find(o => o.code === orgCode);
+     if (!org || org.recoveryKey !== key) { alert("恢复失败：企业代码或密钥错误"); return; }
+     
+     const admin = users.find(u => u.organizationId === org.id && u.role === UserRole.ADMIN);
+     if (!admin) { alert("系统错误：未找到管理员账户"); return; }
+     
+     const updatedUsers = users.map(u => u.id === admin.id ? { ...u, password: newPass } : u);
+     setUsers(updatedUsers);
+     alert("管理员密码重置成功，请使用新密码登录。");
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setActiveTab('dashboard');
+    setLoginError(null);
   };
 
-  const handleSubmitReview = (assignmentId: string, scores: any, comments: any, strengths: string, improvements: string) => {
-    setAssignments(prev => prev.map(a => 
-      a.id === assignmentId 
-        ? { 
-            ...a, 
-            status: EvaluationStatus.SUBMITTED, 
-            scores, 
-            comments, 
-            feedbackStrengths: strengths, 
-            feedbackImprovements: improvements, 
-            submittedAt: new Date().toISOString() 
-          } 
-        : a
-    ));
+  const handleSubmitReview = (assignmentId: string, scores: Record<string, number>, comments: Record<string, string>, strengths: string, improvements: string) => {
+     setAssignments(prev => prev.map(a => 
+       a.id === assignmentId 
+         ? { ...a, scores, comments, feedbackStrengths: strengths, feedbackImprovements: improvements, status: EvaluationStatus.SUBMITTED, submittedAt: new Date().toISOString() } 
+         : a
+     ));
   };
-
+  
   const handleChangePassword = (oldP: string, newP: string) => {
-     if (!currentUser) return;
-     if(currentUser.password !== oldP) {
-        alert("旧密码错误");
-        return;
-     }
+     if (currentUser?.password !== oldP) { alert("旧密码错误"); return; }
      setUsers(users.map(u => u.id === currentUser.id ? { ...u, password: newP } : u));
      setCurrentUser({ ...currentUser, password: newP });
-     setChangePasswordOpen(false);
+     setShowPasswordModal(false);
      alert("密码修改成功");
   };
 
-  // Render Logic
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} onRecover={handleRecover} error={null} />;
+    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} onRecover={handleRecover} error={loginError} />;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
-      {/* Sidebar Navigation */}
-      <div className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-10 transition-all">
-        <div className="h-16 flex items-center px-6 border-b border-slate-100">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-blue-200">
-            <span className="font-bold text-white">N</span>
-          </div>
-          <div className="flex flex-col justify-center">
-             <span className="font-bold text-lg tracking-tight text-slate-800 leading-none">Nexus360</span>
-             {currentOrg && <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-1 truncate max-w-[140px]">{currentOrg.name}</span>}
-          </div>
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+      {/* Sidebar */}
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex">
+        <div className="p-6 border-b border-slate-100 flex items-center">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3">N</div>
+          <span className="font-bold text-lg tracking-tight">Nexus360</span>
         </div>
-
-        <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
-          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Icons.Dashboard />}>仪表盘</NavButton>
-          <NavButton active={activeTab === 'my-reviews'} onClick={() => setActiveTab('my-reviews')} icon={<Icons.List />}>我的评估</NavButton>
+        
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Icons.Dashboard />}>
+            工作台 (Dashboard)
+          </NavButton>
+          <NavButton active={activeTab === 'my-reviews'} onClick={() => setActiveTab('my-reviews')} icon={<Icons.List />}>
+            我的评估 (Reviews)
+            {assignments.filter(a => a.reviewerId === currentUser.id && a.status !== 'SUBMITTED').length > 0 && (
+              <span className="ml-auto bg-red-100 text-red-600 py-0.5 px-2 rounded-full text-xs font-bold">
+                {assignments.filter(a => a.reviewerId === currentUser.id && a.status !== 'SUBMITTED').length}
+              </span>
+            )}
+          </NavButton>
           {(currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) && (
-             <NavButton active={activeTab === 'team-reports'} onClick={() => setActiveTab('team-reports')} icon={<Icons.Chart />}>团队报告</NavButton>
+            <NavButton active={activeTab === 'team-reports'} onClick={() => setActiveTab('team-reports')} icon={<Icons.Chart />}>
+              团队报告 (Reports)
+            </NavButton>
           )}
           {currentUser.role === UserRole.ADMIN && (
-             <NavButton active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<Icons.Settings />}>系统管理</NavButton>
+            <>
+              <div className="pt-4 pb-2 px-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Administration</div>
+              <NavButton active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<Icons.Settings />}>
+                系统设置 (Settings)
+              </NavButton>
+            </>
           )}
-        </div>
+        </nav>
 
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <div className="flex items-center mb-4">
-             <img src={currentUser.avatarUrl} alt="avatar" className="w-8 h-8 rounded-full bg-slate-200" />
-             <div className="ml-3 overflow-hidden">
-                <p className="text-sm font-medium text-slate-700 truncate">{currentUser.name}</p>
-                <p className="text-xs text-slate-500 truncate">{currentUser.role}</p>
-             </div>
-          </div>
-          <div className="space-y-1">
-             <button onClick={() => setChangePasswordOpen(true)} className="w-full text-left text-xs text-slate-500 hover:text-blue-600 px-1 py-1 flex items-center transition-colors"><Icons.Key /><span className="ml-2">修改密码</span></button>
-             <button onClick={handleLogout} className="w-full text-left text-xs text-slate-500 hover:text-red-600 px-1 py-1 flex items-center transition-colors"><svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>退出登录</button>
-          </div>
+        <div className="p-4 border-t border-slate-100">
+           <div className="flex items-center mb-3">
+              <img src={currentUser.avatarUrl} alt="" className="w-8 h-8 rounded-full bg-slate-200" />
+              <div className="ml-3 overflow-hidden">
+                 <p className="text-sm font-medium text-slate-900 truncate">{currentUser.name}</p>
+                 <p className="text-xs text-slate-500 truncate">{currentUser.role}</p>
+              </div>
+           </div>
+           <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowPasswordModal(true)} className="text-xs text-slate-500 hover:text-blue-600 text-left">修改密码</button>
+              <button onClick={handleLogout} className="text-xs text-slate-500 hover:text-red-600 text-right">退出登录</button>
+           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
-         <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {activeTab === 'dashboard' && <Dashboard user={currentUser} users={orgUsers} assignments={orgAssignments} setTab={setActiveTab} />}
-            {activeTab === 'my-reviews' && <MyReviewsList user={currentUser} users={orgUsers} assignments={orgAssignments} questions={orgQuestions} onSubmit={handleSubmitReview} />}
-            {activeTab === 'team-reports' && <TeamReports user={currentUser} users={orgUsers} assignments={orgAssignments} questions={orgQuestions} />}
-            {activeTab === 'admin' && currentUser.role === UserRole.ADMIN && activeCycle && (
-               <AdminConsole 
-                 users={orgUsers} 
-                 setUsers={(newOrgUsers) => {
-                    setUsers(prev => {
-                       const others = prev.filter(u => u.organizationId !== currentUser.organizationId);
-                       return [...others, ...newOrgUsers];
-                    });
-                 }}
-                 questions={orgQuestions}
-                 setQuestions={(newQs) => {
-                    setQuestions(prev => {
-                       // Replace logic for mock: remove all org specific questions, add new ones.
-                       const currentIds = new Set(orgQuestions.map(q => q.id));
-                       const others = prev.filter(q => !currentIds.has(q.id));
-                       return [...others, ...newQs];
-                    });
-                 }}
-                 assignments={orgAssignments}
-                 setAssignments={(newAs) => {
-                    setAssignments(prev => {
-                       const others = prev.filter(a => a.organizationId !== currentUser.organizationId);
-                       return [...others, ...newAs];
-                    });
-                 }}
-                 cycle={activeCycle}
-                 setCycle={(updatedCycle) => {
-                    setCycles(prev => prev.map(c => c.id === updatedCycle.id ? updatedCycle : c));
-                 }}
-                 currentUser={currentUser}
-                 orgId={currentUser.organizationId}
-               />
-            )}
-         </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white border-b border-slate-200 p-4 flex justify-between items-center">
+           <div className="font-bold">Nexus360</div>
+           <button onClick={handleLogout} className="text-sm text-slate-500">退出</button>
+        </div>
+
+        <main className="flex-1 overflow-auto p-4 md:p-8">
+           <div className="max-w-6xl mx-auto">
+             {activeTab === 'dashboard' && <Dashboard user={currentUser} users={users.filter(u => u.organizationId === currentUser.organizationId)} assignments={assignments.filter(a => a.organizationId === currentUser.organizationId)} setTab={setActiveTab} />}
+             
+             {activeTab === 'my-reviews' && <MyReviewsList user={currentUser} users={users.filter(u => u.organizationId === currentUser.organizationId)} assignments={assignments.filter(a => a.organizationId === currentUser.organizationId)} questions={questions} onSubmit={handleSubmitReview} />}
+             
+             {activeTab === 'team-reports' && (currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) && 
+                <TeamReports user={currentUser} users={users.filter(u => u.organizationId === currentUser.organizationId)} assignments={assignments.filter(a => a.organizationId === currentUser.organizationId)} questions={questions} sharedReports={[]} onToggleShare={() => {}} />
+             }
+             
+             {activeTab === 'admin' && currentUser.role === UserRole.ADMIN && currentCycle && (
+                <AdminConsole 
+                   users={users.filter(u => u.organizationId === currentUser.organizationId)} 
+                   setUsers={(newOrgUsers) => {
+                      // Merge logic: Remove old users of this org, add new ones
+                      const otherUsers = users.filter(u => u.organizationId !== currentUser.organizationId);
+                      setUsers([...otherUsers, ...newOrgUsers]);
+                   }}
+                   questions={questions} // Global for now, can be org specific if filtered
+                   setQuestions={setQuestions}
+                   assignments={assignments.filter(a => a.organizationId === currentUser.organizationId)}
+                   setAssignments={(newOrgAssigns) => {
+                      const otherAssigns = assignments.filter(a => a.organizationId !== currentUser.organizationId);
+                      setAssignments([...otherAssigns, ...newOrgAssigns]);
+                   }}
+                   cycle={currentCycle}
+                   setCycle={(c) => setCycles(cycles.map(cy => cy.id === c.id ? c : cy))}
+                   currentUser={currentUser}
+                   orgId={currentUser.organizationId}
+                />
+             )}
+           </div>
+        </main>
       </div>
 
-      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setChangePasswordOpen(false)} onSave={handleChangePassword} />
+      <ChangePasswordModal isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} onSave={handleChangePassword} />
     </div>
   );
 };

@@ -17,8 +17,17 @@ export enum Relationship {
   DIRECT_REPORT = 'DIRECT_REPORT',
 }
 
+export interface Organization {
+  id: string;
+  name: string;
+  code: string; // Unique identifier for login (e.g., 'google', 'tesla')
+  recoveryKey?: string; // Secret key for admin account recovery
+  createdAt: string;
+}
+
 export interface User {
   id: string;
+  organizationId: string; // Link to Organization
   name: string;
   username: string; // Used for login
   password?: string; // Added for authentication
@@ -37,12 +46,14 @@ export interface Competency {
 
 export interface Question {
   id: string;
+  organizationId?: string; // If null, it's a system default question
   text: string;
   category: string; // e.g., "诚信正直", "战略思维"
 }
 
 export interface ReviewCycle {
   id: string;
+  organizationId: string; // Link to Organization
   name: string;
   status: 'ACTIVE' | 'CLOSED' | 'DRAFT';
   dueDate: string;
@@ -50,6 +61,7 @@ export interface ReviewCycle {
 
 export interface ReviewAssignment {
   id: string;
+  organizationId: string; // Link to Organization
   cycleId: string;
   reviewerId: string;
   subjectId: string; // The person being reviewed

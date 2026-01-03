@@ -96,7 +96,8 @@ export const generateFeedbackSummary = async (
 
 export const generateReviewRelationships = async (
   users: User[],
-  cycleId: string
+  cycleId: string,
+  organizationId: string
 ): Promise<ReviewAssignment[]> => {
   try {
     const ai = getAI();
@@ -152,6 +153,7 @@ export const generateReviewRelationships = async (
 
     return relationships.map((rel: any, index: number) => ({
       id: `ai-gen-${Date.now()}-${index}`,
+      organizationId: organizationId,
       cycleId: cycleId,
       reviewerId: rel.reviewerId,
       subjectId: rel.subjectId,
@@ -173,6 +175,7 @@ export const parseOrgChartToRelationships = async (
   orgText: string,
   existingUsers: User[],
   cycleId: string,
+  organizationId: string,
   filePart?: { mimeType: string, data: string }
 ): Promise<{ newUsers: Partial<User>[], assignments: ReviewAssignment[] }> => {
   try {
@@ -231,6 +234,7 @@ export const parseOrgChartToRelationships = async (
     
     const parsedAssignments = assignmentsList.map((rel: any, index: number) => ({
       id: `ai-import-${Date.now()}-${index}`,
+      organizationId: organizationId,
       cycleId: cycleId,
       reviewerId: rel.reviewerId,
       subjectId: rel.subjectId,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   UserRole, 
   User, 
@@ -6,7 +6,8 @@ import {
   ReviewAssignment, 
   Relationship, 
   EvaluationStatus,
-  Question
+  Question,
+  Organization
 } from './types';
 import { Card, Button, Badge, InstructionAlert } from './components/UIComponents';
 import { 
@@ -16,7 +17,7 @@ import { generateFeedbackSummary, generateReviewRelationships, generateQuestionn
 
 // --- Helper Functions ---
 const generateRandomPassword = () => {
-  const chars = "abcdefghjkmnpqrstuvwxyz23456789"; // Removed confusing chars like i, l, 1, o, 0
+  const chars = "abcdefghjkmnpqrstuvwxyz23456789"; 
   let pass = "";
   for (let i = 0; i < 8; i++) {
     pass += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -24,52 +25,52 @@ const generateRandomPassword = () => {
   return pass;
 };
 
-// --- Mock Data ---
-// Updated to generic professional roles with passwords
-const MOCK_USERS: User[] = [
-  { id: 'u1', name: '系统管理员 (Administrator)', username: 'admin', password: '123', email: 'admin@nexus.com', role: UserRole.ADMIN, department: '人力资源部', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin' },
-  { id: 'u2', name: '研发总监 (Director)', username: 'director', password: '123', email: 'director@nexus.com', role: UserRole.MANAGER, department: '技术部', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Manager' },
-  { id: 'u3', name: '高级工程师 A (Senior Eng)', username: 'engineer_a', password: '123', email: 'eng.a@nexus.com', role: UserRole.EMPLOYEE, department: '技术部', managerId: 'u2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=EngA' },
-  { id: 'u4', name: 'UI/UX 设计师 (Designer)', username: 'designer', password: '123', email: 'design@nexus.com', role: UserRole.EMPLOYEE, department: '设计部', managerId: 'u2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Designer' },
-  { id: 'u5', name: '产品经理 (Product Lead)', username: 'pm_lead', password: '123', email: 'pm@nexus.com', role: UserRole.EMPLOYEE, department: '产品部', managerId: 'u2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PM' },
-];
-
-// Based on PDF Page 15-19 examples
-const INITIAL_QUESTIONS: Question[] = [
-  { id: 'q1', category: '诚信正直', text: '公正对待团队成员' },
-  { id: 'q2', category: '诚信正直', text: '巨大压力或诱惑下坚持原则' },
-  { id: 'q3', category: '学习创新', text: '主动寻求他人对自己的反馈/评价' },
-  { id: 'q4', category: '学习创新', text: '借鉴标杆，尝试创新' },
-  { id: 'q5', category: '战略思维', text: '清晰传达公司战略目标' },
-  { id: 'q6', category: '组织优化', text: '提出改进组织流程的建议' },
-  { id: 'q7', category: '人才开发', text: '识别他人的优势或不足' },
-];
-
-const INITIAL_CYCLE: ReviewCycle = {
-  id: 'c1',
-  name: '2025年 领导力素质360度评估',
-  status: 'ACTIVE',
-  dueDate: '2025-11-30',
+const generateRecoveryKey = () => {
+  return Array.from({ length: 4 }, () => Math.random().toString(36).substring(2, 6).toUpperCase()).join('-');
 };
 
-// Initial assignments
+// --- Mock Data (SaaS Structure) ---
+const MOCK_ORGS: Organization[] = [
+  { id: 'org1', name: 'Nexus Tech Inc.', code: 'nexus', recoveryKey: 'NEXU-SREC-OVER-KEY1', createdAt: '2024-01-01' },
+  { id: 'org2', name: 'Future Retail Ltd.', code: 'future', recoveryKey: 'FUTU-RE77-KEY9-9999', createdAt: '2024-02-15' }
+];
+
+const MOCK_USERS: User[] = [
+  // Org 1 Users (Nexus)
+  { id: 'u1', organizationId: 'org1', name: '系统管理员', username: 'admin', password: '123', email: 'admin@nexus.com', role: UserRole.ADMIN, department: 'HR', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin' },
+  { id: 'u2', organizationId: 'org1', name: '研发总监', username: 'director', password: '123', email: 'director@nexus.com', role: UserRole.MANAGER, department: 'Tech', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Manager' },
+  { id: 'u3', organizationId: 'org1', name: '高级工程师 A', username: 'engineer_a', password: '123', email: 'eng.a@nexus.com', role: UserRole.EMPLOYEE, department: 'Tech', managerId: 'u2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=EngA' },
+  { id: 'u4', organizationId: 'org1', name: 'UI/UX 设计师', username: 'designer', password: '123', email: 'design@nexus.com', role: UserRole.EMPLOYEE, department: 'Design', managerId: 'u2', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Designer' },
+  
+  // Org 2 Users (Future Retail) - Login with same username 'admin' but different org code
+  { id: 'u101', organizationId: 'org2', name: 'HR Admin', username: 'admin', password: '123', email: 'hr@future.com', role: UserRole.ADMIN, department: 'HR', avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HRFuture' },
+];
+
+const INITIAL_QUESTIONS: Question[] = [
+  { id: 'q1', text: '公正对待团队成员', category: '诚信正直' },
+  { id: 'q2', text: '巨大压力或诱惑下坚持原则', category: '诚信正直' },
+  { id: 'q3', text: '主动寻求他人对自己的反馈/评价', category: '学习创新' },
+  { id: 'q4', text: '借鉴标杆，尝试创新', category: '学习创新' },
+  { id: 'q5', text: '清晰传达公司战略目标', category: '战略思维' },
+  { id: 'q6', text: '提出改进组织流程的建议', category: '组织优化' },
+  { id: 'q7', text: '识别他人的优势或不足', category: '人才开发' },
+];
+
+const INITIAL_CYCLES: ReviewCycle[] = [
+  { id: 'c1', organizationId: 'org1', name: '2025年Q1 绩效评估', status: 'ACTIVE', dueDate: '2025-03-31' },
+  { id: 'c2', organizationId: 'org2', name: '2024年度总结', status: 'ACTIVE', dueDate: '2024-12-31' },
+];
+
 const INITIAL_ASSIGNMENTS: ReviewAssignment[] = [
   {
-    id: 'a1', cycleId: 'c1', reviewerId: 'u3', subjectId: 'u3', relationship: Relationship.SELF, status: EvaluationStatus.PENDING, scores: {}, comments: {}, feedbackStrengths: '', feedbackImprovements: ''
+    id: 'a1', organizationId: 'org1', cycleId: 'c1', reviewerId: 'u3', subjectId: 'u3', relationship: Relationship.SELF, status: EvaluationStatus.PENDING, scores: {}, comments: {}, feedbackStrengths: '', feedbackImprovements: ''
   },
   {
-    id: 'a2', cycleId: 'c1', reviewerId: 'u2', subjectId: 'u3', relationship: Relationship.MANAGER, status: EvaluationStatus.SUBMITTED, 
+    id: 'a2', organizationId: 'org1', cycleId: 'c1', reviewerId: 'u2', subjectId: 'u3', relationship: Relationship.MANAGER, status: EvaluationStatus.SUBMITTED, 
     scores: { q1: 4, q2: 5, q3: 3, q4: 4, q5: 3, q6: 4, q7: 4 }, 
     comments: {}, 
     feedbackStrengths: "事业激情高，团队合作意识强。",
     feedbackImprovements: "执行力需要加强，战略思维有待提升。"
-  },
-  {
-    id: 'a3', cycleId: 'c1', reviewerId: 'u4', subjectId: 'u3', relationship: Relationship.PEER, status: EvaluationStatus.SUBMITTED,
-    scores: { q1: 5, q2: 4, q3: 4, q4: 4, q5: 2, q6: 3, q7: 5 },
-    comments: {},
-    feedbackStrengths: "敬业、努力、专心；对事业执着。",
-    feedbackImprovements: "统筹协调能力，规划计划能力。"
   }
 ];
 
@@ -88,10 +89,14 @@ const Icons = {
   Refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   Key: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>,
   Copy: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>,
-  Download: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+  Download: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+  Building: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-3m10 3v-3m-10 3h10" /></svg>,
+  Search: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
+  ShieldCheck: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
 };
 
-// --- Confirm Dialog ---
+// --- Reused Components ---
+// (Keeping Card, InstructionAlert, Button, Badge, ConfirmDialog, ChangePasswordModal, NavButton as is)
 const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen: boolean, title: string, message: string, onConfirm: () => void, onCancel: () => void }) => {
   if (!isOpen) return null;
   return (
@@ -113,7 +118,6 @@ const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel }: { isOpen
   );
 };
 
-// --- Change Password Dialog ---
 const ChangePasswordModal = ({ isOpen, onClose, onSave }: { isOpen: boolean, onClose: () => void, onSave: (o: string, n: string) => void }) => {
   const [oldPass, setOldPass] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -125,38 +129,21 @@ const ChangePasswordModal = ({ isOpen, onClose, onSave }: { isOpen: boolean, onC
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 transform transition-all scale-100">
         <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
-          <span className="bg-blue-100 text-blue-600 p-1.5 rounded-full mr-2">
-            <Icons.Key />
-          </span>
+          <span className="bg-blue-100 text-blue-600 p-1.5 rounded-full mr-2"><Icons.Key /></span>
           修改密码
         </h3>
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">当前密码</label>
-            <input 
-              type="password" 
-              className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-              value={oldPass} 
-              onChange={e => setOldPass(e.target.value)} 
-            />
+            <input type="password" className="w-full p-2 border border-slate-300 rounded text-sm" value={oldPass} onChange={e => setOldPass(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">新密码</label>
-            <input 
-              type="password" 
-              className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-              value={newPass} 
-              onChange={e => setNewPass(e.target.value)} 
-            />
+            <input type="password" className="w-full p-2 border border-slate-300 rounded text-sm" value={newPass} onChange={e => setNewPass(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">确认新密码</label>
-            <input 
-              type="password" 
-              className="w-full p-2 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-              value={confirmPass} 
-              onChange={e => setConfirmPass(e.target.value)} 
-            />
+            <input type="password" className="w-full p-2 border border-slate-300 rounded text-sm" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} />
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-6 border-t border-slate-100 pt-4">
@@ -173,7 +160,6 @@ const ChangePasswordModal = ({ isOpen, onClose, onSave }: { isOpen: boolean, onC
   )
 }
 
-// --- Navigation Button ---
 const NavButton = ({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children?: React.ReactNode }) => (
   <button
     onClick={onClick}
@@ -181,24 +167,112 @@ const NavButton = ({ active, onClick, icon, children }: { active: boolean; onCli
       active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
     }`}
   >
-    <span className={`flex-shrink-0 ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500'}`}>
-      {icon}
-    </span>
-    <span className="ml-3 flex-1 text-left flex items-center">
-      {children}
-    </span>
+    <span className={`flex-shrink-0 ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500'}`}>{icon}</span>
+    <span className="ml-3 flex-1 text-left flex items-center">{children}</span>
   </button>
 );
 
-// --- Login Screen ---
-const LoginScreen = ({ onLogin, error }: { onLogin: (u: string, p: string) => void, error: string | null }) => {
+// --- Login Screen (SaaS Version) ---
+const LoginScreen = ({ 
+  onLogin, 
+  onRegister, 
+  onRecover,
+  error 
+}: { 
+  onLogin: (orgCode: string, u: string, p: string) => void, 
+  onRegister: (orgName: string, orgCode: string, adminName: string, adminUser: string, adminPass: string) => void,
+  onRecover: (orgCode: string, recoveryKey: string, newPass: string) => void,
+  error: string | null 
+}) => {
+  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [orgCode, setOrgCode] = useState(''); // nexus
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  // Register Fields
+  const [newOrgName, setNewOrgName] = useState('');
+  const [newOrgCode, setNewOrgCode] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+
+  // Recovery Fields
+  const [recoverOrgCode, setRecoverOrgCode] = useState('');
+  const [recoverKey, setRecoverKey] = useState('');
+  const [recoverNewPass, setRecoverNewPass] = useState('');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(username, password);
+    if (mode === 'LOGIN') {
+      onLogin(orgCode, username, password);
+    } else {
+      if(!newOrgName || !newOrgCode || !newAdminName || !newAdminUsername || !newAdminPassword) {
+        alert("请填写所有字段");
+        return;
+      }
+      onRegister(newOrgName, newOrgCode, newAdminName, newAdminUsername, newAdminPassword);
+    }
   };
+
+  const handleOrgNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const name = e.target.value;
+    setNewOrgName(name);
+    // Auto-generate code if user hasn't manually edited it much (simple heuristic or just overwrite)
+    // Here we just suggest one if empty or matches previous suggestion
+    if (!newOrgCode || newOrgCode === name.slice(0, 6).toLowerCase().replace(/\s+/g, '')) {
+       setNewOrgCode(name.toLowerCase().replace(/\s+/g, '').slice(0, 6));
+    }
+  };
+
+  const handleRecoverySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onRecover(recoverOrgCode, recoverKey, recoverNewPass);
+    setShowRecovery(false);
+    setRecoverOrgCode(''); setRecoverKey(''); setRecoverNewPass('');
+  };
+
+  const handleResetData = () => {
+    if(confirm("确定要重置所有演示数据吗？这将清除所有注册的企业和用户，恢复到初始演示状态。")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+  if (showRecovery) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100">
+          <div className="flex items-center mb-6">
+             <div className="bg-yellow-100 p-2 rounded-full mr-3"><Icons.ShieldCheck /></div>
+             <div>
+               <h3 className="text-lg font-bold text-slate-900">管理员账号恢复</h3>
+               <p className="text-xs text-slate-500">使用注册时提供的恢复密钥重置管理员密码。</p>
+             </div>
+          </div>
+          
+          <form className="space-y-4" onSubmit={handleRecoverySubmit}>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">企业代码 (Org Code)</label>
+              <input required type="text" className="w-full p-2 border border-slate-300 rounded text-sm" value={recoverOrgCode} onChange={e => setRecoverOrgCode(e.target.value)} placeholder="例如: nexus" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">恢复密钥 (Recovery Key)</label>
+              <input required type="text" className="w-full p-2 border border-slate-300 rounded text-sm font-mono" value={recoverKey} onChange={e => setRecoverKey(e.target.value)} placeholder="XXXX-XXXX-XXXX-XXXX" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">设置新管理员密码</label>
+              <input required type="password" className="w-full p-2 border border-slate-300 rounded text-sm" value={recoverNewPass} onChange={e => setRecoverNewPass(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 mt-6 border-t border-slate-100 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setShowRecovery(false)}>返回登录</Button>
+              <Button type="submit">确认重置</Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -207,11 +281,26 @@ const LoginScreen = ({ onLogin, error }: { onLogin: (u: string, p: string) => vo
           <span className="font-bold text-2xl text-white">N</span>
         </div>
         <h2 className="text-center text-3xl font-extrabold text-slate-900">Nexus360 测评系统</h2>
-        <p className="mt-2 text-center text-sm text-slate-600">企业级 360 度绩效评估平台</p>
+        <p className="mt-2 text-center text-sm text-slate-600">企业级多租户绩效评估平台</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-xl sm:rounded-lg sm:px-10">
+          <div className="flex border-b border-slate-200 mb-6">
+            <button 
+              className={`flex-1 pb-2 text-sm font-bold ${mode === 'LOGIN' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}
+              onClick={() => setMode('LOGIN')}
+            >
+              员工/管理员登录
+            </button>
+            <button 
+              className={`flex-1 pb-2 text-sm font-bold ${mode === 'REGISTER' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-500'}`}
+              onClick={() => setMode('REGISTER')}
+            >
+              注册新企业
+            </button>
+          </div>
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm flex items-center">
@@ -220,56 +309,136 @@ const LoginScreen = ({ onLogin, error }: { onLogin: (u: string, p: string) => vo
               </div>
             )}
             
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-slate-700">
-                用户名 (Username)
-              </label>
-              <div className="mt-1">
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="请输入您的账号"
-                />
-              </div>
-            </div>
+            {mode === 'LOGIN' ? (
+              <>
+                 <div>
+                  <label className="block text-sm font-medium text-slate-700">企业代码 (Company ID) 或 名称</label>
+                  <div className="mt-1 relative rounded-md shadow-sm">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Icons.Building />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={orgCode}
+                      onChange={(e) => setOrgCode(e.target.value)}
+                      className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 sm:text-sm border-slate-300 rounded-md p-2 border"
+                      placeholder="例如: nexus 或 Nexus Tech"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">用户名</label>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="mt-1 appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="请输入您的账号"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700">密码</label>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-1 appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                <div className="flex justify-end">
+                   <button type="button" onClick={() => setShowRecovery(true)} className="text-xs text-blue-600 hover:text-blue-800">忘记密码 / 恢复账号?</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-slate-700">企业名称</label>
+                    <input
+                      type="text"
+                      required
+                      value={newOrgName}
+                      onChange={handleOrgNameChange}
+                      className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="例如: My Tech Startup"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-slate-700">
+                      企业代码 (登录ID) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="mt-1 relative rounded-md shadow-sm">
+                       <input
+                        type="text"
+                        required
+                        value={newOrgCode}
+                        onChange={(e) => setNewOrgCode(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                        className="focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-slate-300 rounded-md p-2 border font-mono bg-slate-50"
+                        placeholder="例如: mytech"
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">员工将使用此代码进行登录，请牢记。</p>
+                  </div>
+                </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-                密码 (Password)
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="请输入您的密码"
-                />
-              </div>
-            </div>
+                <div className="border-t border-slate-200 pt-4 mt-4">
+                  <h4 className="text-sm font-bold text-slate-900 mb-3">管理员信息</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">姓名</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAdminName}
+                        onChange={(e) => setNewAdminName(e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">登录账号 (Username)</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAdminUsername}
+                        onChange={(e) => setNewAdminUsername(e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">设置密码</label>
+                      <input
+                        type="password"
+                        required
+                        value={newAdminPassword}
+                        onChange={(e) => setNewAdminPassword(e.target.value)}
+                        className="mt-1 block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div>
               <button
                 type="submit"
                 className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
-                登录系统
+                {mode === 'LOGIN' ? '安全登录' : '立即注册并试用'}
               </button>
             </div>
           </form>
           
-          <div className="mt-6 text-center">
-            <p className="text-xs text-slate-400">
-              如忘记密码或无法登录，请联系人力资源部管理员重置。
-            </p>
+          <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
+             <div className="flex items-center space-x-2">
+                <Icons.Lock /> <span>企业级数据隔离加密存储</span>
+             </div>
+             <button onClick={handleResetData} className="text-slate-300 hover:text-red-400 underline">
+               重置演示数据
+             </button>
           </div>
         </div>
       </div>
@@ -277,457 +446,314 @@ const LoginScreen = ({ onLogin, error }: { onLogin: (u: string, p: string) => vo
   );
 };
 
-// --- Main Components ---
+// --- Missing Components Definitions ---
 
 const Dashboard = ({ user, users, assignments, setTab }: { user: User, users: User[], assignments: ReviewAssignment[], setTab: (t: any) => void }) => {
-  const pendingReviews = assignments.filter(a => a.reviewerId === user.id && a.status === EvaluationStatus.PENDING);
-  const completedReviews = assignments.filter(a => a.reviewerId === user.id && a.status === EvaluationStatus.SUBMITTED);
-  const myFeedback = assignments.filter(a => a.subjectId === user.id && a.status === EvaluationStatus.SUBMITTED);
-
+  const myTodo = assignments.filter(a => a.reviewerId === user.id && a.status !== EvaluationStatus.SUBMITTED);
+  const myDone = assignments.filter(a => a.reviewerId === user.id && a.status === EvaluationStatus.SUBMITTED);
+  
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6 border-l-4 border-l-blue-500">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-              <Icons.List />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-slate-500">待办评估</p>
-              <p className="text-2xl font-bold text-slate-900">{pendingReviews.length}</p>
-            </div>
+        <Card className="p-6 border-l-4 border-blue-500">
+          <h3 className="text-sm font-medium text-slate-500">待处理评估</h3>
+          <div className="mt-2 flex items-baseline">
+             <span className="text-3xl font-bold text-slate-900">{myTodo.length}</span>
+             <span className="ml-2 text-sm text-slate-500">个任务</span>
           </div>
-          <div className="mt-4">
-            <Button variant="ghost" onClick={() => setTab('my-reviews')} className="text-sm p-0 h-auto">
-              去处理 &rarr;
-            </Button>
+          <Button variant="ghost" className="mt-4 text-sm p-0 text-blue-600 hover:text-blue-800" onClick={() => setTab('my-reviews')}>立即处理 &rarr;</Button>
+        </Card>
+        <Card className="p-6 border-l-4 border-green-500">
+          <h3 className="text-sm font-medium text-slate-500">已完成评估</h3>
+          <div className="mt-2 flex items-baseline">
+             <span className="text-3xl font-bold text-slate-900">{myDone.length}</span>
+             <span className="ml-2 text-sm text-slate-500">个任务</span>
           </div>
         </Card>
-
-        <Card className="p-6 border-l-4 border-l-green-500">
-          <div className="flex items-center">
-            <div className="p-3 rounded-full bg-green-100 text-green-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-slate-500">已完成评估</p>
-              <p className="text-2xl font-bold text-slate-900">{completedReviews.length}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 border-l-4 border-l-purple-500">
-          <div className="flex items-center">
-             <div className="p-3 rounded-full bg-purple-100 text-purple-600">
-              <Icons.Chart />
-             </div>
-             <div className="ml-4">
-               <p className="text-sm font-medium text-slate-500">收到的反馈</p>
-               <p className="text-2xl font-bold text-slate-900">{myFeedback.length}</p>
-             </div>
+        <Card className="p-6 border-l-4 border-purple-500">
+          <h3 className="text-sm font-medium text-slate-500">团队人数</h3>
+          <div className="mt-2 flex items-baseline">
+             <span className="text-3xl font-bold text-slate-900">{users.length}</span>
+             <span className="ml-2 text-sm text-slate-500">人</span>
           </div>
         </Card>
       </div>
-
-      <Card className="p-6">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">待办事项</h3>
-        {pendingReviews.length > 0 ? (
-          <div className="space-y-3">
-            {pendingReviews.map(r => {
-               const subject = users.find(u => u.id === r.subjectId);
-               return (
-                 <div key={r.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-lg bg-slate-50">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-lg">
-                        {subject?.avatarUrl ? <img src={subject.avatarUrl} className="w-full h-full rounded-full"/> : (subject?.name[0] || '?')}
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-bold text-slate-900">评价: {subject?.name}</p>
-                        <p className="text-xs text-slate-500">关系: {r.relationship}</p>
-                      </div>
-                    </div>
-                    <Button variant="secondary" onClick={() => setTab('my-reviews')}>开始评估</Button>
-                 </div>
-               )
-            })}
-          </div>
-        ) : (
-          <p className="text-slate-500 text-sm">暂无待办事项，做得好！</p>
-        )}
-      </Card>
+      
+      <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+        <h3 className="font-bold text-blue-900 mb-2">欢迎回来, {user.name}</h3>
+        <p className="text-blue-700 text-sm">
+          当前绩效考核周期正在进行中。请确保在截止日期前完成所有指派给您的评估任务。
+          作为{user.role === 'MANAGER' ? '管理者' : '员工'}，您的反馈对团队成长至关重要。
+        </p>
+      </div>
     </div>
   );
 };
 
 const MyReviewsList = ({ user, users, assignments, questions, onSubmit }: { user: User, users: User[], assignments: ReviewAssignment[], questions: Question[], onSubmit: any }) => {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<any>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [comments, setComments] = useState<Record<string, string>>({});
+  const [strengths, setStrengths] = useState("");
+  const [improvements, setImprovements] = useState("");
 
-  const pendingReviews = assignments.filter(a => a.reviewerId === user.id && a.status === EvaluationStatus.PENDING);
-  const submittedReviews = assignments.filter(a => a.reviewerId === user.id && a.status === EvaluationStatus.SUBMITTED);
+  const myAssignments = assignments.filter(a => a.reviewerId === user.id);
+  const activeAssignment = myAssignments.find(a => a.id === editingId);
+  const subject = activeAssignment ? users.find(u => u.id === activeAssignment.subjectId) : null;
 
-  const initForm = (assignment: ReviewAssignment) => {
-    setFormData({
-      scores: assignment.scores || {},
-      comments: assignment.comments || {},
-      feedbackStrengths: assignment.feedbackStrengths || '',
-      feedbackImprovements: assignment.feedbackImprovements || ''
-    });
-    setExpandedId(assignment.id);
+  const handleStart = (a: ReviewAssignment) => {
+     setScores(a.scores || {});
+     setComments(a.comments || {});
+     setStrengths(a.feedbackStrengths || "");
+     setImprovements(a.feedbackImprovements || "");
+     setEditingId(a.id);
   };
 
-  const handleScoreChange = (qId: string, score: number) => {
-    setFormData({ ...formData, scores: { ...formData.scores, [qId]: score } });
+  const handleSubmit = () => {
+    if (!editingId) return;
+    if (Object.keys(scores).length < questions.length) {
+       alert("请为所有维度打分");
+       return;
+    }
+    onSubmit(editingId, scores, comments, strengths, improvements);
+    setEditingId(null);
   };
 
-  const submit = (id: string) => {
-    onSubmit(id, formData.scores, formData.comments, formData.feedbackStrengths, formData.feedbackImprovements);
-    setExpandedId(null);
-  };
+  if (editingId && activeAssignment && subject) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+           <h2 className="text-xl font-bold text-slate-800">正在评估: {subject.name} <span className="text-sm font-normal text-slate-500">({activeAssignment.relationship})</span></h2>
+           <Button variant="secondary" onClick={() => setEditingId(null)}>返回列表</Button>
+        </div>
+        
+        <Card className="p-6 space-y-8">
+           {questions.map(q => (
+             <div key={q.id} className="border-b border-slate-100 pb-6 last:border-0">
+                <div className="mb-2">
+                   <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">{q.category}</span>
+                   <p className="mt-2 text-slate-800 font-medium">{q.text}</p>
+                </div>
+                <div className="flex items-center gap-4 mt-3">
+                   <div className="flex gap-2">
+                      {[1,2,3,4,5].map(s => (
+                        <button 
+                          key={s}
+                          onClick={() => setScores({...scores, [q.id]: s})}
+                          className={`w-10 h-10 rounded-full font-bold transition-all ${scores[q.id] === s ? 'bg-blue-600 text-white scale-110' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                   </div>
+                   <input 
+                     placeholder="添加评论 (可选)" 
+                     className="flex-1 text-sm border-slate-200 rounded-md p-2" 
+                     value={comments[q.id] || ''}
+                     onChange={e => setComments({...comments, [q.id]: e.target.value})}
+                   />
+                </div>
+             </div>
+           ))}
+           
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+              <div>
+                 <label className="block text-sm font-bold text-slate-700 mb-2">主要优势 (Strengths)</label>
+                 <textarea 
+                    className="w-full border-slate-300 rounded-lg p-3 text-sm h-32"
+                    placeholder="该员工在哪些方面表现出色？"
+                    value={strengths}
+                    onChange={e => setStrengths(e.target.value)}
+                 />
+              </div>
+              <div>
+                 <label className="block text-sm font-bold text-slate-700 mb-2">改进建议 (Improvements)</label>
+                 <textarea 
+                    className="w-full border-slate-300 rounded-lg p-3 text-sm h-32"
+                    placeholder="该员工在哪些方面需要改进？"
+                    value={improvements}
+                    onChange={e => setImprovements(e.target.value)}
+                 />
+              </div>
+           </div>
+
+           <div className="pt-6 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setEditingId(null)}>取消</Button>
+              <Button onClick={handleSubmit}>提交评估</Button>
+           </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-          <span className="w-2 h-8 bg-blue-600 rounded-full mr-3"></span>
-          待评估 ({pendingReviews.length})
-        </h3>
-        <div className="space-y-4">
-          {pendingReviews.map(r => {
-             const subject = users.find(u => u.id === r.subjectId);
-             const isExpanded = expandedId === r.id;
-             
+    <Card className="overflow-hidden">
+      <table className="min-w-full divide-y divide-slate-200">
+        <thead className="bg-slate-50">
+          <tr>
+            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">被评估人</th>
+            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">关系</th>
+            <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">状态</th>
+            <th className="px-6 py-3 text-right text-xs font-bold text-slate-500">操作</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200 bg-white">
+           {myAssignments.length === 0 && (
+             <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-500 text-sm">暂无评估任务</td></tr>
+           )}
+           {myAssignments.map(a => {
+             const subj = users.find(u => u.id === a.subjectId);
              return (
-               <Card key={r.id} className={`transition-all ${isExpanded ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}>
-                 <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => !isExpanded && initForm(r)}>
-                    <div className="flex items-center">
-                      <img src={subject?.avatarUrl} className="w-10 h-10 rounded-full bg-slate-100" />
-                      <div className="ml-3">
-                        <p className="font-bold text-slate-900">{subject?.name}</p>
-                        <p className="text-xs text-slate-500">关系: <Badge>{r.relationship}</Badge></p>
-                      </div>
-                    </div>
-                    <div>
-                      {isExpanded ? (
-                        <Button variant="ghost" onClick={(e) => { e.stopPropagation(); setExpandedId(null); }}>收起</Button>
-                      ) : (
-                        <Button variant="primary">去评估</Button>
-                      )}
-                    </div>
-                 </div>
-                 
-                 {isExpanded && (
-                   <div className="p-6 border-t border-slate-100 bg-slate-50/50">
-                     <InstructionAlert title="评分说明">
-                       请根据被评价人在考核周期内的实际行为表现进行客观评分（1-5分）。5分代表卓越，3分代表达标，1分代表亟需改进。
-                     </InstructionAlert>
-                     
-                     <div className="space-y-6">
-                        {questions.map(q => (
-                          <div key={q.id} className="bg-white p-4 rounded-lg border border-slate-200">
-                             <div className="mb-2">
-                               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{q.category}</span>
-                               <p className="text-slate-900 font-medium mt-1">{q.text}</p>
-                             </div>
-                             <div className="flex items-center space-x-4 mt-3">
-                               {[1,2,3,4,5].map(score => (
-                                 <label key={score} className={`flex flex-col items-center cursor-pointer p-2 rounded transition-colors ${formData.scores?.[q.id] === score ? 'bg-blue-100 text-blue-700 font-bold' : 'hover:bg-slate-50'}`}>
-                                   <input 
-                                     type="radio" 
-                                     name={`q-${q.id}`} 
-                                     value={score} 
-                                     checked={formData.scores?.[q.id] === score}
-                                     onChange={() => handleScoreChange(q.id, score)}
-                                     className="hidden"
-                                   />
-                                   <span className="w-8 h-8 flex items-center justify-center rounded-full border border-slate-300 bg-white mb-1">
-                                     {score}
-                                   </span>
-                                   <span className="text-xs text-slate-500">
-                                     {score === 1 ? '差' : score === 5 ? '优' : ''}
-                                   </span>
-                                 </label>
-                               ))}
-                             </div>
-                          </div>
-                        ))}
-
-                        <div className="bg-white p-4 rounded-lg border border-slate-200">
-                           <h4 className="font-bold text-slate-800 mb-3">综合评语</h4>
-                           <div className="space-y-4">
-                             <div>
-                               <label className="block text-sm font-medium text-slate-700 mb-1">该员工的主要优势 (Strengths)</label>
-                               <textarea 
-                                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                                 rows={3}
-                                 value={formData.feedbackStrengths}
-                                 onChange={e => setFormData({...formData, feedbackStrengths: e.target.value})}
-                                 placeholder="例如：具备很强的责任心..."
-                               />
-                             </div>
-                             <div>
-                               <label className="block text-sm font-medium text-slate-700 mb-1">建议改进的方面 (Improvements)</label>
-                               <textarea 
-                                 className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
-                                 rows={3}
-                                 value={formData.feedbackImprovements}
-                                 onChange={e => setFormData({...formData, feedbackImprovements: e.target.value})}
-                                 placeholder="例如：建议加强跨部门沟通..."
-                               />
-                             </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     <div className="mt-6 flex justify-end">
-                       <Button onClick={() => submit(r.id)}>提交评估</Button>
-                     </div>
-                   </div>
-                 )}
-               </Card>
-             );
-          })}
-          {pendingReviews.length === 0 && <p className="text-slate-500 italic">所有评估已完成。</p>}
-        </div>
-      </div>
-
-      <div className="pt-8 border-t border-slate-200">
-        <h3 className="text-lg font-bold text-slate-400 mb-4">已提交的历史记录</h3>
-        <div className="opacity-75">
-          {submittedReviews.map(r => {
-             const subject = users.find(u => u.id === r.subjectId);
-             return (
-               <div key={r.id} className="flex items-center justify-between p-4 border-b border-slate-100">
-                  <div className="flex items-center">
-                     <span className="text-green-500 mr-3"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg></span>
-                     <p className="text-slate-600">已评价 <span className="font-bold">{subject?.name}</span></p>
-                  </div>
-                  <span className="text-xs text-slate-400">{new Date(r.submittedAt || '').toLocaleDateString()}</span>
-               </div>
+               <tr key={a.id}>
+                 <td className="px-6 py-4 text-sm font-medium text-slate-900">{subj?.name || 'Unknown'}</td>
+                 <td className="px-6 py-4 text-sm text-slate-500"><Badge>{a.relationship}</Badge></td>
+                 <td className="px-6 py-4 text-sm">
+                    {a.status === 'SUBMITTED' 
+                      ? <span className="text-green-600 font-bold text-xs flex items-center"><svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>已提交</span>
+                      : <span className="text-orange-500 font-bold text-xs">待处理</span>
+                    }
+                 </td>
+                 <td className="px-6 py-4 text-right">
+                    {a.status !== 'SUBMITTED' && (
+                       <Button className="px-3 py-1 text-xs" onClick={() => handleStart(a)}>开始评估</Button>
+                    )}
+                 </td>
+               </tr>
              )
-          })}
-        </div>
-      </div>
-    </div>
-  );
+           })}
+        </tbody>
+      </table>
+    </Card>
+  )
 };
 
-const TeamReports = ({ user, users, assignments, questions, sharedReports, onToggleShare }: { 
-  user: User, 
-  users: User[], 
-  assignments: ReviewAssignment[], 
-  questions: Question[],
-  sharedReports: Set<string>,
-  onToggleShare: (id: string) => void 
-}) => {
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
-  const [report, setReport] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
+const TeamReports = ({ user, users, assignments, questions, sharedReports, onToggleShare }: any) => {
+  const relevantUsers = user.role === UserRole.ADMIN 
+     ? users 
+     : users.filter((u: User) => u.managerId === user.id || u.id === user.id);
 
-  // Determine who calls who
-  // If user is Admin, can see all. If Manager, can see direct reports and self.
-  // Add shared users to the visible list
-  const myTeam = users.filter(u => 
-    user.role === UserRole.ADMIN || 
-    u.managerId === user.id || 
-    u.id === user.id ||
-    sharedReports.has(u.id)
-  );
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [summary, setSummary] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
-  const generateReport = async (subjectId: string) => {
-    setLoading(true);
-    setSelectedSubjectId(subjectId);
-    setReport(null);
+  const handleGenerateSummary = async (subject: User) => {
+    setLoadingSummary(true);
+    const subjectReviews = assignments.filter((a: ReviewAssignment) => a.subjectId === subject.id && a.status === EvaluationStatus.SUBMITTED);
+    const res = await generateFeedbackSummary(subjectReviews, questions, subject.name);
+    setSummary(res);
+    setLoadingSummary(false);
+  };
+
+  const selectedUser = users.find((u: User) => u.id === selectedUserId);
+
+  if (selectedUserId && selectedUser) {
+    const subjectReviews = assignments.filter((a: ReviewAssignment) => a.subjectId === selectedUserId && a.status === EvaluationStatus.SUBMITTED);
     
-    // Find all reviews for this subject
-    const subjectReviews = assignments.filter(a => a.subjectId === subjectId && a.status === EvaluationStatus.SUBMITTED);
-    
-    if (subjectReviews.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    const subject = users.find(u => u.id === subjectId);
-
-    // Calculate Scores
-    // Average per category
-    const catScores: Record<string, { total: number, count: number, selfTotal: number }> = {};
-    
-    subjectReviews.forEach(r => {
+    // Better Radar Data: Group by Category
+    const categoryMap = new Map<string, { total: number, count: number }>();
+    subjectReviews.forEach((r: ReviewAssignment) => {
        Object.entries(r.scores).forEach(([qId, score]) => {
-          const q = questions.find(qu => qu.id === qId);
-          if (q && score > 0) {
-            if (!catScores[q.category]) catScores[q.category] = { total: 0, count: 0, selfTotal: 0 };
-            
-            if (r.relationship === Relationship.SELF) {
-              catScores[q.category].selfTotal = score;
-            } else {
-              catScores[q.category].total += score;
-              catScores[q.category].count += 1;
-            }
+          const q = questions.find((qu: Question) => qu.id === qId);
+          if (q && typeof score === 'number') {
+             const curr = categoryMap.get(q.category) || { total: 0, count: 0 };
+             categoryMap.set(q.category, { total: curr.total + score, count: curr.count + 1 });
           }
        });
     });
 
-    const categoryScores = Object.entries(catScores).map(([cat, val]) => ({
-      category: cat,
-      score: val.count > 0 ? parseFloat((val.total / val.count).toFixed(1)) : 0,
-      selfScore: val.selfTotal || 0,
-      fullMark: 5
+    const chartData = Array.from(categoryMap.entries()).map(([cat, val]) => ({
+       subject: cat,
+       A: (val.total / val.count).toFixed(1),
+       fullMark: 5
     }));
 
-    // Generate AI Summary
-    const aiSummary = await generateFeedbackSummary(subjectReviews, questions, subject?.name || '');
+    return (
+       <div className="space-y-6">
+          <div className="flex items-center justify-between">
+             <h2 className="text-xl font-bold text-slate-800">绩效报告: {selectedUser.name}</h2>
+             <Button variant="secondary" onClick={() => { setSelectedUserId(null); setSummary(null); }}>返回列表</Button>
+          </div>
 
-    setReport({
-      subjectId: subjectId,
-      subjectName: subject?.name,
-      categoryScores,
-      ...aiSummary
-    });
-    setLoading(false);
-  };
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <Card className="p-6">
+                <h3 className="font-bold text-slate-700 mb-4">能力雷达图</h3>
+                <div className="h-64 flex items-center justify-center">
+                   {chartData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="subject" />
+                          <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                          <Radar name={selectedUser.name} dataKey="A" stroke="#2563eb" fill="#3b82f6" fillOpacity={0.6} />
+                          <Tooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                   ) : (
+                      <p className="text-slate-400 text-sm">暂无足够数据生成图表</p>
+                   )}
+                </div>
+             </Card>
+
+             <Card className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                   <h3 className="font-bold text-slate-700">AI 智能分析</h3>
+                   <Button className="text-xs" onClick={() => handleGenerateSummary(selectedUser)} isLoading={loadingSummary} disabled={subjectReviews.length === 0}>
+                     {summary ? '重新生成' : '生成分析'}
+                   </Button>
+                </div>
+                {summary ? (
+                   <div className="space-y-4 animate-in fade-in">
+                      <div className="bg-slate-50 p-3 rounded text-sm text-slate-700 leading-relaxed">
+                         {summary.summary}
+                      </div>
+                      <div>
+                         <span className="text-xs font-bold text-green-600 uppercase">优势</span>
+                         <div className="flex flex-wrap gap-2 mt-1">
+                            {summary.strengths.map((s:string, i:number) => <Badge key={i} color="green">{s}</Badge>)}
+                         </div>
+                      </div>
+                      <div>
+                         <span className="text-xs font-bold text-orange-600 uppercase">建议改进</span>
+                         <div className="flex flex-wrap gap-2 mt-1">
+                            {summary.improvements.map((s:string, i:number) => <Badge key={i} color="yellow">{s}</Badge>)}
+                         </div>
+                      </div>
+                   </div>
+                ) : (
+                   <p className="text-slate-400 text-sm">点击生成按钮获取基于 {subjectReviews.length} 份评估的 AI 洞察。</p>
+                )}
+             </Card>
+          </div>
+       </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 h-[calc(100vh-150px)]">
-       {/* Sidebar List */}
-       <div className="w-full md:w-1/3 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
-         <div className="p-4 bg-white border-b border-slate-200 font-bold text-slate-700">团队成员</div>
-         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-           {myTeam.map(u => (
-             <button
-               key={u.id}
-               onClick={() => generateReport(u.id)}
-               className={`w-full text-left p-3 rounded-lg flex items-center transition-colors ${selectedSubjectId === u.id ? 'bg-blue-100 ring-1 ring-blue-300' : 'hover:bg-white hover:shadow-sm'}`}
-             >
-               <div className="relative">
-                 <img src={u.avatarUrl} className="w-8 h-8 rounded-full bg-white" />
-                 {sharedReports.has(u.id) && (
-                    <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-0.5 border border-white" title="已公开">
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+     <Card>
+        <div className="p-4 border-b border-slate-100">
+           <h3 className="font-bold text-slate-800">团队成员</h3>
+        </div>
+        <ul className="divide-y divide-slate-100">
+           {relevantUsers.map((u: User) => (
+              <li key={u.id} className="p-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer" onClick={() => setSelectedUserId(u.id)}>
+                 <div className="flex items-center">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 mr-3">
+                       {u.name.charAt(0)}
                     </div>
-                 )}
-               </div>
-               <div className="ml-3">
-                 <p className={`text-sm font-bold ${selectedSubjectId === u.id ? 'text-blue-800' : 'text-slate-800'}`}>{u.name}</p>
-                 <p className="text-xs text-slate-500">{u.role}</p>
-               </div>
-             </button>
+                    <div>
+                       <p className="text-sm font-medium text-slate-900">{u.name}</p>
+                       <p className="text-xs text-slate-500">{u.department}</p>
+                    </div>
+                 </div>
+                 <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </li>
            ))}
-         </div>
-       </div>
-
-       {/* Main Report Area */}
-       <div className="flex-1 bg-white border border-slate-200 rounded-lg p-6 overflow-y-auto">
-         {!selectedSubjectId ? (
-           <div className="h-full flex flex-col items-center justify-center text-slate-400">
-             <Icons.Chart />
-             <p className="mt-2">请选择左侧成员查看报告</p>
-           </div>
-         ) : loading ? (
-           <div className="h-full flex flex-col items-center justify-center text-blue-500">
-             <svg className="animate-spin h-8 w-8 mb-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-             </svg>
-             <p>AI 正在分析反馈数据生成报告...</p>
-           </div>
-         ) : report ? (
-           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="flex justify-between items-end border-b border-slate-100 pb-4">
-               <div>
-                 <h2 className="text-2xl font-bold text-slate-900">{report.subjectName} 的 360 评估报告</h2>
-                 <p className="text-slate-500 text-sm mt-1">生成时间: {new Date().toLocaleDateString()}</p>
-               </div>
-               <div className="flex items-center space-x-3">
-                 {user.role === UserRole.ADMIN && (
-                    <div className="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                       <span className="text-xs font-medium text-slate-600">全员可见:</span>
-                       <button 
-                         onClick={() => onToggleShare(report.subjectId)}
-                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${sharedReports.has(report.subjectId) ? 'bg-blue-600' : 'bg-slate-300'}`}
-                       >
-                         <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${sharedReports.has(report.subjectId) ? 'translate-x-4' : 'translate-x-1'}`} />
-                       </button>
-                    </div>
-                 )}
-                 <Button variant="secondary" onClick={() => window.print()}>打印报告</Button>
-               </div>
-             </div>
-
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <div className="h-64">
-                 <h3 className="font-bold text-slate-700 mb-4 text-center">能力维度雷达图</h3>
-                 <ResponsiveContainer width="100%" height="100%">
-                   <RadarChart cx="50%" cy="50%" outerRadius="80%" data={report.categoryScores}>
-                     <PolarGrid />
-                     <PolarAngleAxis dataKey="category" tick={{ fill: '#64748b', fontSize: 12 }} />
-                     <PolarRadiusAxis angle={30} domain={[0, 5]} />
-                     <Radar name="他人评价" dataKey="score" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
-                     <Radar name="自评" dataKey="selfScore" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.1} strokeDasharray="3 3" />
-                     <Legend />
-                     <Tooltip />
-                   </RadarChart>
-                 </ResponsiveContainer>
-               </div>
-               
-               <div className="space-y-6">
-                 <div>
-                    <h3 className="font-bold text-slate-700 mb-2 flex items-center">
-                       <span className="p-1 bg-blue-100 text-blue-600 rounded mr-2"><Icons.Sparkles/></span>
-                       AI 综合点评
-                    </h3>
-                    <div className="bg-blue-50/50 p-4 rounded-lg text-sm text-slate-700 leading-relaxed border border-blue-100">
-                      {report.summary}
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                   <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                      <h4 className="font-bold text-green-800 text-sm mb-2">优势 (Strengths)</h4>
-                      <ul className="list-disc list-inside text-xs text-green-700 space-y-1">
-                        {report.strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}
-                      </ul>
-                   </div>
-                   <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
-                      <h4 className="font-bold text-yellow-800 text-sm mb-2">建议改进 (Improvements)</h4>
-                      <ul className="list-disc list-inside text-xs text-yellow-700 space-y-1">
-                        {report.improvements.map((s: string, i: number) => <li key={i}>{s}</li>)}
-                      </ul>
-                   </div>
-                 </div>
-               </div>
-             </div>
-             
-             <div className="bg-slate-50 p-6 rounded-lg">
-                <h3 className="font-bold text-slate-700 mb-4">详细得分</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {report.categoryScores.map((c: any) => (
-                    <div key={c.category} className="bg-white p-3 rounded shadow-sm">
-                      <p className="text-xs text-slate-500 mb-1">{c.category}</p>
-                      <div className="flex justify-between items-end">
-                        <span className="text-xl font-bold text-slate-900">{c.score}</span>
-                        <span className="text-xs text-slate-400">自评: {c.selfScore}</span>
-                      </div>
-                      <div className="w-full bg-slate-100 h-1.5 mt-2 rounded-full overflow-hidden">
-                        <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(c.score / 5) * 100}%` }}></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-             </div>
-           </div>
-         ) : (
-           <div className="h-full flex flex-col items-center justify-center text-slate-400">
-             <p>暂无数据</p>
-           </div>
-         )}
-       </div>
-    </div>
-  );
+        </ul>
+     </Card>
+  )
 };
 
-// --- Admin Console ---
+// --- Modified Admin Console ---
 
 const AdminConsole = ({ 
   users, 
@@ -738,17 +764,19 @@ const AdminConsole = ({
   setAssignments,
   cycle,
   setCycle,
-  currentUser
+  currentUser,
+  orgId
 }: { 
   users: User[], 
-  setUsers: React.Dispatch<React.SetStateAction<User[]>>,
+  setUsers: (users: User[]) => void,
   questions: Question[], 
   setQuestions: (q: Question[]) => void,
   assignments: ReviewAssignment[],
-  setAssignments: React.Dispatch<React.SetStateAction<ReviewAssignment[]>>,
+  setAssignments: (a: ReviewAssignment[]) => void,
   cycle: ReviewCycle,
   setCycle: (c: ReviewCycle) => void,
-  currentUser: User
+  currentUser: User,
+  orgId: string
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'relations' | 'questions'>('relations');
   const [generatingRel, setGeneratingRel] = useState(false);
@@ -762,6 +790,9 @@ const AdminConsole = ({
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({ name: '', username: '', role: UserRole.EMPLOYEE, department: '', password: '123456' });
+
+  // Relationship Filtering
+  const [filterUserId, setFilterUserId] = useState<string>('');
 
   const handleExportUsers = () => {
     // UTF-8 BOM for Excel to open Chinese characters correctly
@@ -792,15 +823,15 @@ const AdminConsole = ({
     setConfirmConfig({
       isOpen: true,
       title: '批量生成随机密码',
-      message: '确定要为所有用户（除当前管理员外）重新生成随机的 8 位密码吗？此操作将覆盖现有密码，请务必在操作后导出账号凭证。',
+      message: '确定要为当前企业所有用户（除您自己外）重新生成随机的 8 位密码吗？',
       onConfirm: () => {
-        setUsers(prev => prev.map(u => {
-          // Don't reset if it's the current admin user to prevent lockout
+        const updated = users.map(u => {
           if (u.id === currentUser.id) return u; 
           return { ...u, password: generateRandomPassword() };
-        }));
+        });
+        setUsers(updated);
         setConfirmConfig(null);
-        alert("已成功为所有员工生成新的随机密码！请立即点击“导出账号凭证”保存。");
+        alert("已成功为员工生成新的随机密码！");
       }
     });
   };
@@ -829,7 +860,7 @@ const AdminConsole = ({
 
   const handleGenerateRelationships = async () => {
     setGeneratingRel(true);
-    const newRels = await generateReviewRelationships(users, cycle.id);
+    const newRels = await generateReviewRelationships(users, cycle.id, orgId);
     setAssignments(newRels);
     setGeneratingRel(false);
   };
@@ -839,7 +870,6 @@ const AdminConsole = ({
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        // Remove data URL prefix (e.g., "data:image/png;base64,")
         const base64 = result.split(',')[1];
         resolve(base64);
       };
@@ -854,7 +884,7 @@ const AdminConsole = ({
       title: '移除考核关系',
       message: '确定要移除这条考核关系吗？',
       onConfirm: () => {
-        setAssignments(prev => prev.filter(a => a.id !== id));
+        setAssignments(assignments.filter(a => a.id !== id));
         setConfirmConfig(null);
       }
     });
@@ -864,15 +894,23 @@ const AdminConsole = ({
     const newId = `q-custom-${Date.now()}`;
     setQuestions([...questions, {
       id: newId,
+      organizationId: orgId,
       category: '自定义维度',
       text: '请在此输入新的考核题目...'
     }]);
   };
 
+  const updateQuestion = (id: string, field: 'category' | 'text', value: string) => {
+    const updated = questions.map(q => q.id === id ? { ...q, [field]: value } : q);
+    setQuestions(updated);
+  };
+
+  const deleteQuestion = (id: string) => {
+     setQuestions(questions.filter(q => q.id !== id));
+  };
+
   const handleImportOrgChart = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
-    // Check for file input
     const fileInput = document.getElementById('orgChartFile') as HTMLInputElement;
     const file = fileInput?.files?.[0];
 
@@ -880,17 +918,9 @@ const AdminConsole = ({
       alert("请上传文件或输入文本描述以开始导入。");
       return;
     }
-
-    if (file && file.size > 5 * 1024 * 1024) {
-      alert("文件过大！请上传小于 5MB 的 PDF 或图片。");
-      return;
-    }
-    
     setImportingOrg(true);
     
     let filePart = undefined;
-    // Pass CSV or text content as additional text instruction to AI
-    // Pass PDF or Images as inline data
     let textInstruction = importText;
 
     if (file) {
@@ -899,53 +929,38 @@ const AdminConsole = ({
          textInstruction += `\n\n[Attached File Content]:\n${text}`;
       } else {
          const base64Data = await fileToBase64(file);
-         // Infer MIME type if missing or generic, for correct Gemini processing
          let mimeType = file.type;
-         if (!mimeType || mimeType === 'application/octet-stream') {
-            if (file.name.endsWith('.pdf')) mimeType = 'application/pdf';
-            else if (file.name.endsWith('.xlsx')) mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-            else if (file.name.endsWith('.xls')) mimeType = 'application/vnd.ms-excel';
-            else if (file.name.endsWith('.pptx')) mimeType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-            else if (file.name.endsWith('.ppt')) mimeType = 'application/vnd.ms-powerpoint';
-         }
-         
-         filePart = {
-            mimeType: mimeType || 'application/pdf', // Default fallback usually safe for Gemini document processing
-            data: base64Data
-         };
+         if (!mimeType || mimeType === 'application/octet-stream') mimeType = 'application/pdf'; // fallback
+         filePart = { mimeType, data: base64Data };
       }
     }
 
-    const result = await parseOrgChartToRelationships(textInstruction, users, cycle.id, filePart);
+    const result = await parseOrgChartToRelationships(textInstruction, users, cycle.id, orgId, filePart);
     
-    // Merge new users
     if (result.newUsers && result.newUsers.length > 0) {
       const createdUsers = (result.newUsers || []).map(u => ({
         id: u.id || `u-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        organizationId: orgId,
         name: u.name || 'New User',
         username: (u.name || 'user').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
-        password: '123456', // Default password for AI imported users
-        email: u.email || `${(u.name || 'user').toLowerCase().replace(/\s+/g, '.')}@nexus.com`,
+        password: '123456',
+        email: u.email || 'user@example.com',
         role: (u.role ? u.role.toUpperCase() as UserRole : UserRole.EMPLOYEE),
         department: u.department || 'Imported',
         managerId: u.managerId,
         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`
       }));
       setUsers([...users, ...createdUsers]);
-      alert(`已成功识别并添加 ${createdUsers.length} 位新成员！(默认密码: 123456)`);
     }
 
-    // Merge assignments
     if (result.assignments && result.assignments.length > 0) {
       setAssignments([...assignments, ...result.assignments]);
-      alert(`已生成 ${result.assignments.length} 条考核关系！`);
+      alert(`导入成功！添加了 ${result.newUsers.length} 位用户和 ${result.assignments.length} 条考核关系。`);
     } else {
-      alert("未能识别出有效的考核关系。请检查文件内容是否包含清晰的上下级或团队关系描述。");
+      alert("AI未能识别出有效数据，请重试。");
     }
     
     setImportingOrg(false);
-    setImportText('');
-    if (fileInput) fileInput.value = '';
   };
 
   const handleImportUsers = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -955,9 +970,8 @@ const AdminConsole = ({
     setImportingUsers(true);
     try {
       let filePart = null;
-      
       let textContent = '';
-      if (file.type === 'text/csv' || file.name.endsWith('.csv') || file.type === 'text/plain') {
+      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
          textContent = await file.text();
       } else {
          const base64 = await fileToBase64(file);
@@ -967,15 +981,11 @@ const AdminConsole = ({
       const importedUsers = await parseUserList(filePart, textContent);
       
       if (importedUsers && importedUsers.length > 0) {
-        // Current usernames set for uniqueness check
         const existingUsernames = new Set(users.map(u => u.username));
-        
         const newUsers = (importedUsers || []).map(u => {
            let baseUsername = (u.name || 'user').toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
            let uniqueUsername = baseUsername;
            let counter = 1;
-           
-           // Simple duplicate resolution
            while (existingUsernames.has(uniqueUsername)) {
               uniqueUsername = `${baseUsername}${counter}`;
               counter++;
@@ -984,20 +994,18 @@ const AdminConsole = ({
 
            return {
              id: `u-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+             organizationId: orgId,
              name: u.name || 'Unknown',
              username: uniqueUsername,
-             password: '123456', // Default password for imported users, can be batch reset later
+             password: '123456',
              email: u.email || `${uniqueUsername}@nexus.com`,
              role: u.role || UserRole.EMPLOYEE,
              department: u.department || 'Imported',
              avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`
            };
         }) as User[];
-        
         setUsers([...users, ...newUsers]);
-        alert(`成功导入 ${newUsers.length} 名用户。(默认密码: 123456，建议使用“批量生成随机密码”重置)`);
-      } else {
-        alert("未能识别到有效用户数据。请检查文件格式。");
+        alert(`成功导入 ${newUsers.length} 名用户。`);
       }
     } catch (err) {
       console.error(err);
@@ -1008,32 +1016,6 @@ const AdminConsole = ({
     }
   };
 
-  const handleExportExcel = () => {
-    const headers = ["ID", "Reviewer Name", "Subject Name", "Relationship", "Status", "Cycle"];
-    const rows = assignments.map(a => {
-      const reviewer = users.find(u => u.id === a.reviewerId);
-      const subject = users.find(u => u.id === a.subjectId);
-      return [
-        a.id,
-        reviewer?.name || a.reviewerId,
-        subject?.name || a.subjectId,
-        a.relationship,
-        a.status,
-        cycle.name
-      ];
-    });
-
-    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `nexus360_assignments_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const handleSaveUser = () => {
     if (!newUser.name || !newUser.username) return;
 
@@ -1042,12 +1024,13 @@ const AdminConsole = ({
     } else {
       const user: User = {
         id: `u-${Date.now()}`,
+        organizationId: orgId,
         name: newUser.name,
         username: newUser.username,
-        email: `${newUser.username}@nexus.com`,
+        email: `${newUser.username}@${orgId}.com`,
         role: newUser.role as UserRole,
         department: newUser.department || 'General',
-        password: newUser.password || '123456', // Set default if empty on create
+        password: newUser.password || '123456',
         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.username}`
       };
       setUsers([...users, user]);
@@ -1063,9 +1046,8 @@ const AdminConsole = ({
       title: '删除用户确认',
       message: '确定要删除该用户吗？此操作不可撤销，且该用户相关的考核记录（自评、他评）都将被一并移除。',
       onConfirm: () => {
-        // Use functional updates to prevent stale state in closure
-        setUsers((prev) => prev.filter(u => u.id !== userId));
-        setAssignments((prev) => prev.filter(a => a.reviewerId !== userId && a.subjectId !== userId));
+        setUsers(users.filter(u => u.id !== userId));
+        setAssignments(assignments.filter(a => a.reviewerId !== userId && a.subjectId !== userId));
         setConfirmConfig(null);
       }
     });
@@ -1075,11 +1057,10 @@ const AdminConsole = ({
     setConfirmConfig({
       isOpen: true,
       title: '重置密码',
-      message: '确定要将该用户的密码重置为默认密码 "123456" 吗？',
+      message: '确定重置为默认密码 "123456" 吗？',
       onConfirm: () => {
         setUsers(users.map(u => u.id === userId ? { ...u, password: '123456' } : u));
         setConfirmConfig(null);
-        alert("密码已重置为 123456");
       }
     });
   };
@@ -1096,57 +1077,20 @@ const AdminConsole = ({
     setShowAddUser(true);
   };
 
-  const handleGenerateQuestionnaire = async () => {
-    setGeneratingQ(true);
-    const newQs = await generateQuestionnaire();
-    if (newQs.length > 0) {
-      setQuestions(newQs);
-    }
-    setGeneratingQ(false);
-  };
-
-  const deleteQuestion = (id: string) => {
-    setQuestions(questions.filter(q => q.id !== id));
-  };
-
-  const updateQuestionText = (id: string, text: string) => {
-    setQuestions(questions.map(q => q.id === id ? { ...q, text } : q));
-  };
+  const filteredAssignments = useMemo(() => {
+     if (!filterUserId) return assignments;
+     return assignments.filter(a => a.reviewerId === filterUserId || a.subjectId === filterUserId);
+  }, [assignments, filterUserId]);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
         <div>
           <h2 className="text-xl font-bold text-slate-800">系统管理控制台</h2>
-          <p className="text-sm text-slate-500">配置考核周期、用户及流程</p>
-        </div>
-        <div className="flex items-center gap-2">
-           <span className="text-sm font-bold text-slate-600">当前周期:</span>
-           <input 
-             value={cycle.name}
-             onChange={(e) => setCycle({...cycle, name: e.target.value})}
-             className="border-b border-slate-300 focus:border-blue-500 outline-none px-2 py-1 text-slate-800 font-medium w-64"
-           />
-           <span className="text-sm text-slate-400 ml-2">截止:</span>
-           <input 
-             type="date"
-             value={cycle.dueDate}
-             onChange={(e) => setCycle({...cycle, dueDate: e.target.value})}
-             className="border border-slate-300 rounded px-2 py-1 text-sm text-slate-600"
-           />
+          <p className="text-sm text-slate-500">当前管理企业: <span className="font-bold text-blue-600">{orgId}</span></p>
         </div>
       </div>
 
-      <InstructionAlert title="管理指南">
-        管理员可在此配置用户、问卷及考核关系。建议按顺序进行配置：
-        <ul className="list-decimal list-inside mt-1">
-          <li><strong>用户管理：</strong> 导入员工名单后，请使用<strong>“批量生成随机密码”</strong>功能确保账户安全，并通过<strong>“导出账号凭证”</strong>将账号密码分发给员工。</li>
-          <li><strong>考核关系设置：</strong> 可使用“一键生成”功能或通过“导入组织架构”由 AI 自动分析创建复杂的 360 度评价关系矩阵。</li>
-          <li><strong>问卷设计：</strong> 利用 AI 基于公司价值观和当前考核目标，自动生成符合 SMART 原则的题库。</li>
-        </ul>
-      </InstructionAlert>
-
-      {/* Sub Tabs */}
       <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg w-fit">
         {(['relations', 'questions', 'users'] as const).map(tab => (
           <button
@@ -1167,6 +1111,7 @@ const AdminConsole = ({
 
       {activeSubTab === 'users' && (
         <Card className="p-6">
+           {/* Reuse existing UI logic but bind to handlers above */}
            <div className="flex flex-col gap-4 mb-6">
             <div className="flex justify-between items-center">
                <h3 className="text-lg font-bold text-slate-800">用户列表</h3>
@@ -1181,61 +1126,27 @@ const AdminConsole = ({
                </div>
             </div>
 
-            {/* Batch Operations Toolbar */}
             <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">批量操作:</span>
-               
                <label className="cursor-pointer bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 px-3 py-1.5 rounded text-sm font-medium flex items-center transition-colors">
                   <Icons.Upload /> <span className="ml-1.5">{importingUsers ? '导入中...' : '导入名单'}</span>
                   <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleImportUsers} disabled={importingUsers} />
                </label>
-               
                <div className="h-6 w-px bg-slate-300 mx-1"></div>
-
-               <Button variant="secondary" className="text-sm py-1.5" onClick={handleBatchGeneratePasswords} title="为所有用户重置随机密码">
-                  <Icons.Key /> <span className="ml-1">批量生成随机密码</span>
-               </Button>
-               
-               <Button variant="secondary" className="text-sm py-1.5" onClick={handleExportCredentials} title="导出含密码的CSV文件用于分发">
-                  <Icons.Download /> <span className="ml-1">导出账号凭证 (CSV)</span>
-               </Button>
+               <Button variant="secondary" className="text-sm py-1.5" onClick={handleBatchGeneratePasswords}><Icons.Key /> <span className="ml-1">批量重置密码</span></Button>
+               <Button variant="secondary" className="text-sm py-1.5" onClick={handleExportCredentials}><Icons.Download /> <span className="ml-1">导出凭证</span></Button>
             </div>
           </div>
 
           {showAddUser && (
-            <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200 animate-in fade-in slide-in-from-top-2">
-              <h4 className="text-sm font-bold text-slate-700 mb-3">{editingUserId ? '编辑用户' : '新增用户'}</h4>
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <input 
-                  placeholder="姓名" 
-                  className="p-2 border rounded text-sm"
-                  value={newUser.name}
-                  onChange={e => setNewUser({...newUser, name: e.target.value})}
-                />
-                <input 
-                  placeholder="用户名 (User ID)" 
-                  className="p-2 border rounded text-sm"
-                  value={newUser.username}
-                  onChange={e => setNewUser({...newUser, username: e.target.value})}
-                />
-                <input 
-                  placeholder="密码 (默认: 123456)" 
-                  className="p-2 border rounded text-sm"
-                  value={newUser.password}
-                  onChange={e => setNewUser({...newUser, password: e.target.value})}
-                />
-                <input 
-                  placeholder="部门" 
-                  className="p-2 border rounded text-sm"
-                  value={newUser.department}
-                  onChange={e => setNewUser({...newUser, department: e.target.value})}
-                />
+            <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <input placeholder="姓名" className="p-2 border rounded text-sm" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+                <input placeholder="用户名" className="p-2 border rounded text-sm" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} />
+                <input placeholder="密码" className="p-2 border rounded text-sm" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                <input placeholder="部门" className="p-2 border rounded text-sm" value={newUser.department} onChange={e => setNewUser({...newUser, department: e.target.value})} />
                 <div className="flex gap-2">
-                   <select 
-                    className="p-2 border rounded text-sm flex-1"
-                    value={newUser.role}
-                    onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}
-                   >
+                   <select className="p-2 border rounded text-sm flex-1" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
                      <option value={UserRole.EMPLOYEE}>员工</option>
                      <option value={UserRole.MANAGER}>经理</option>
                      <option value={UserRole.ADMIN}>管理员</option>
@@ -1252,6 +1163,7 @@ const AdminConsole = ({
                 <tr className="bg-slate-50">
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">姓名</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">用户名</th>
+                  <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">密码</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">角色</th>
                   <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">部门</th>
                   <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">操作</th>
@@ -1262,27 +1174,14 @@ const AdminConsole = ({
                   <tr key={u.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{u.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.username}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500"><code className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono text-xs">{u.password || '123456'}</code></td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500"><Badge>{u.role}</Badge></td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.department}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
-                        <button 
-                          onClick={() => handleResetPassword(u.id)}
-                          className="text-yellow-600 hover:text-yellow-800 p-1 rounded hover:bg-yellow-50"
-                          title="重置密码"
-                        >
-                          <Icons.Refresh />
-                        </button>
-                        <button onClick={() => startEditUser(u)} className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50">
-                          <Icons.Edit />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteUser(u.id)} 
-                          className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
-                          title="删除用户"
-                        >
-                          <Icons.Trash />
-                        </button>
+                        <button onClick={() => handleResetPassword(u.id)} className="text-yellow-600 hover:text-yellow-800 p-1" title="重置密码"><Icons.Refresh /></button>
+                        <button onClick={() => startEditUser(u)} className="text-blue-600 hover:text-blue-900 p-1" title="编辑用户"><Icons.Edit /></button>
+                        <button onClick={() => handleDeleteUser(u.id)} className="text-red-600 hover:text-red-900 p-1" title="删除用户及相关记录"><Icons.Trash /></button>
                       </div>
                     </td>
                   </tr>
@@ -1295,82 +1194,56 @@ const AdminConsole = ({
 
       {activeSubTab === 'relations' && (
         <div className="space-y-6">
-          <Card className="p-6 bg-gradient-to-r from-blue-50 to-white border-blue-100">
+           <Card className="p-6 bg-gradient-to-r from-blue-50 to-white border-blue-100">
+             {/* Import UI reusing handleImportOrgChart */}
              <div className="space-y-4">
-                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-blue-900">AI 智能分析并导入</h3>
-                    <p className="text-sm text-slate-600 mt-1">
-                      支持上传 <strong>PDF, 图片</strong> (组织架构图)，或 <strong>CSV/Excel</strong> (花名册)。AI 将自动识别新用户并创建 360 度考核关系。
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border-2 border-dashed border-blue-200 rounded-lg p-4 flex flex-col justify-center items-center bg-blue-50/50 hover:bg-blue-50 transition-colors relative overflow-hidden">
-                     <input 
-                       id="orgChartFile" 
-                       type="file" 
-                       accept=".pdf, .png, .jpg, .jpeg, .csv, .txt, .xlsx, .xls, .pptx, .ppt"
-                       className="opacity-0 absolute inset-0 cursor-pointer w-full h-full z-10"
-                       title=" "
-                     />
-                     <div className="pointer-events-none flex flex-col items-center">
-                        <Icons.Upload />
-                        <p className="text-sm text-blue-500 mt-2 font-medium">点击上传文件 (PDF, PNG, CSV, Excel)</p>
-                        <p className="text-xs text-slate-400 mt-1">支持拖拽上传</p>
-                     </div>
-                  </div>
-                  <textarea
-                    className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32"
-                    placeholder="或者在此直接粘贴文本描述..."
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                  />
-                </div>
-                
                 <div className="flex gap-3 pt-2">
-                  <Button onClick={handleImportOrgChart} isLoading={importingOrg} variant="primary">
-                    <Icons.Sparkles /> <span className="ml-2">开始分析并导入</span>
-                  </Button>
-                  <Button onClick={handleGenerateRelationships} isLoading={generatingRel} variant="secondary">
-                     <span className="ml-2">仅基于现有用户生成</span>
-                  </Button>
+                  <div className="relative overflow-hidden inline-block">
+                     <Button variant="primary"><Icons.Upload /> <span className="ml-2">上传架构图/花名册</span></Button>
+                     <input id="orgChartFile" type="file" className="absolute top-0 left-0 opacity-0 w-full h-full cursor-pointer" onChange={handleImportOrgChart} />
+                  </div>
+                  <Button onClick={handleGenerateRelationships} isLoading={generatingRel} variant="secondary">一键生成关系</Button>
                 </div>
              </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-800">考核关系矩阵 ({assignments.length} 条)</h3>
-              <Button variant="secondary" className="text-xs" onClick={handleExportExcel}>
-                导出 Excel
-              </Button>
-            </div>
-            <div className="overflow-x-auto max-h-[500px]">
+           </Card>
+           <Card className="p-6">
+             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+              <h3 className="text-lg font-bold text-slate-800">考核关系矩阵 ({filteredAssignments.length})</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">按人员筛选:</span>
+                <select 
+                  className="border border-slate-300 rounded px-2 py-1 text-sm bg-white"
+                  value={filterUserId}
+                  onChange={(e) => setFilterUserId(e.target.value)}
+                >
+                  <option value="">全部显示</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+             </div>
+             {/* Table for assignments */}
+             <div className="overflow-x-auto max-h-[500px]">
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="sticky top-0 bg-white z-10 shadow-sm">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">被考核人</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">考核人</th>
-                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">关系</th>
-                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">操作</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">被考核人</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">考核人</th>
+                    <th className="px-6 py-3 text-left text-xs font-bold text-slate-500">关系</th>
+                    <th className="px-6 py-3 text-right text-xs font-bold text-slate-500">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {assignments.map(a => {
+                  {filteredAssignments.map(a => {
                      const subject = users.find(u => u.id === a.subjectId);
                      const reviewer = users.find(u => u.id === a.reviewerId);
                      return (
                       <tr key={a.id} className="hover:bg-slate-50">
-                        <td className="px-6 py-3 text-sm font-medium text-slate-900">{subject?.name || a.subjectId}</td>
-                        <td className="px-6 py-3 text-sm text-slate-600">{reviewer?.name || a.reviewerId}</td>
-                        <td className="px-6 py-3 text-sm text-slate-500">
-                          <Badge color={a.relationship === 'MANAGER' ? 'red' : 'blue'}>{a.relationship}</Badge>
-                        </td>
+                        <td className="px-6 py-3 text-sm">{subject?.name || a.subjectId}</td>
+                        <td className="px-6 py-3 text-sm">{reviewer?.name || a.reviewerId}</td>
+                        <td className="px-6 py-3 text-sm"><Badge>{a.relationship}</Badge></td>
                         <td className="px-6 py-3 text-right">
                           <button 
-                            onClick={() => handleDeleteAssignment(a.id)}
+                            onClick={() => handleDeleteAssignment(a.id)} 
                             className="text-red-500 hover:text-red-700 text-xs font-medium"
                           >
                             移除
@@ -1379,74 +1252,69 @@ const AdminConsole = ({
                       </tr>
                      );
                   })}
-                  {assignments.length === 0 && (
-                     <tr>
-                      <td colSpan={4} className="px-6 py-10 text-center text-slate-400">
-                        暂无考核关系。请导入或生成。
-                      </td>
-                    </tr>
+                  {filteredAssignments.length === 0 && (
+                    <tr><td colSpan={4} className="p-8 text-center text-slate-400">没有找到相关考核记录</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </Card>
+           </Card>
         </div>
       )}
 
       {activeSubTab === 'questions' && (
         <div className="space-y-6">
-          <Card className="p-6 bg-gradient-to-r from-purple-50 to-white border-purple-100">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-purple-900">AI 智能设计问卷</h3>
-                <p className="text-sm text-slate-600 mt-1">
-                  严格遵循：陈述句式、第三人称、单一行为点、正向描述。
-                </p>
-              </div>
-              <Button onClick={handleGenerateQuestionnaire} isLoading={generatingQ} className="bg-purple-600 hover:bg-purple-700 w-full md:w-auto">
-                <Icons.Sparkles /> <span className="ml-2">生成推荐问卷</span>
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-             <h3 className="text-lg font-bold text-slate-800 mb-6">当前问卷题目 ({questions.length})</h3>
+           <Card className="p-6">
+             <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">问卷题库管理</h3>
+                  <p className="text-xs text-slate-500 mt-1">您可以直接修改下方的维度标签和题目内容，变更将实时保存。</p>
+                </div>
+                <Button onClick={handleAddQuestion} variant="secondary">+ 添加新题目</Button>
+             </div>
              <div className="space-y-4">
                {questions.map((q, idx) => (
-                 <div key={q.id} className="flex items-start space-x-4 p-4 rounded-lg border border-slate-200 hover:border-blue-300 transition-colors bg-slate-50">
-                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center font-bold text-slate-500 text-sm">
+                 <div key={q.id} className="group flex items-start space-x-4 p-4 rounded-xl border border-slate-200 bg-white hover:shadow-md transition-shadow">
+                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center font-bold text-slate-400 text-sm mt-1">
                      {idx + 1}
                    </div>
-                   <div className="flex-1 space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">{q.category}</span>
+                   <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-4">
+                      {/* Editable Category */}
+                      <div className="md:col-span-3">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">维度</label>
+                         <input
+                           className="w-full text-xs font-bold text-blue-700 bg-blue-50 px-3 py-2 rounded-lg border-transparent focus:border-blue-300 focus:bg-white focus:ring-0 transition-colors"
+                           value={q.category}
+                           onChange={(e) => updateQuestion(q.id, 'category', e.target.value)}
+                           placeholder="维度名称"
+                         />
                       </div>
-                      <input 
-                        className="w-full bg-transparent border-none p-0 text-slate-800 font-medium focus:ring-0"
-                        value={q.text}
-                        onChange={(e) => updateQuestionText(q.id, e.target.value)}
-                      />
+                      {/* Editable Text */}
+                      <div className="md:col-span-9">
+                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">题目内容</label>
+                         <textarea 
+                           className="w-full bg-transparent border-b border-slate-200 focus:border-blue-500 text-sm py-1 resize-none focus:outline-none"
+                           rows={2}
+                           value={q.text}
+                           onChange={(e) => updateQuestion(q.id, 'text', e.target.value)}
+                           placeholder="请输入考核题目描述..."
+                         />
+                      </div>
                    </div>
-                   <button onClick={() => deleteQuestion(q.id)} className="text-slate-400 hover:text-red-500">
-                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                   <button 
+                     onClick={() => deleteQuestion(q.id)} 
+                     className="text-slate-300 hover:text-red-500 transition-colors pt-2"
+                     title="删除此题"
+                   >
+                     <Icons.Trash />
                    </button>
                  </div>
                ))}
              </div>
-             <div className="mt-6 flex justify-center">
-               <Button 
-                 onClick={handleAddQuestion}
-                 variant="secondary" 
-                 className="w-full border-dashed border-2"
-               >
-                 + 添加自定义题目
-               </Button>
-             </div>
-          </Card>
+           </Card>
         </div>
       )}
-      
-      {/* Confirmation Modal Render */}
+
       {confirmConfig && (
         <ConfirmDialog 
           isOpen={confirmConfig.isOpen}
@@ -1460,177 +1328,297 @@ const AdminConsole = ({
   );
 }
 
-// --- App Component ---
+const App = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('nexus_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Global State (Mock Database with Persistence)
+  // We initialize from localStorage if available, otherwise use MOCK data.
+  // We also add useEffects to persist changes.
+  
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem('nexus_users');
+    return saved ? JSON.parse(saved) : MOCK_USERS;
+  });
+  
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    const saved = localStorage.getItem('nexus_questions');
+    return saved ? JSON.parse(saved) : INITIAL_QUESTIONS;
+  });
+  
+  const [cycles, setCycles] = useState<ReviewCycle[]>(() => {
+    const saved = localStorage.getItem('nexus_cycles');
+    return saved ? JSON.parse(saved) : INITIAL_CYCLES;
+  });
+  
+  const [assignments, setAssignments] = useState<ReviewAssignment[]>(() => {
+    const saved = localStorage.getItem('nexus_assignments');
+    return saved ? JSON.parse(saved) : INITIAL_ASSIGNMENTS;
+  });
+  
+  const [orgs, setOrgs] = useState<Organization[]>(() => {
+    const saved = localStorage.getItem('nexus_orgs');
+    return saved ? JSON.parse(saved) : MOCK_ORGS;
+  });
+  
+  // --- Persistence Effects ---
+  useEffect(() => {
+    if (currentUser) localStorage.setItem('nexus_current_user', JSON.stringify(currentUser));
+    else localStorage.removeItem('nexus_current_user');
+  }, [currentUser]);
 
-export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'my-reviews' | 'team-reports' | 'admin'>('dashboard');
-  const [assignments, setAssignments] = useState<ReviewAssignment[]>(INITIAL_ASSIGNMENTS);
-  const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
-  const [activeCycle, setActiveCycle] = useState<ReviewCycle>(INITIAL_CYCLE);
-  const [sharedReports, setSharedReports] = useState<Set<string>>(new Set());
-  const [loginError, setLoginError] = useState<string | null>(null);
+  useEffect(() => localStorage.setItem('nexus_users', JSON.stringify(users)), [users]);
+  useEffect(() => localStorage.setItem('nexus_questions', JSON.stringify(questions)), [questions]);
+  useEffect(() => localStorage.setItem('nexus_cycles', JSON.stringify(cycles)), [cycles]);
+  useEffect(() => localStorage.setItem('nexus_assignments', JSON.stringify(assignments)), [assignments]);
+  useEffect(() => localStorage.setItem('nexus_orgs', JSON.stringify(orgs)), [orgs]);
+
   const [isChangePasswordOpen, setChangePasswordOpen] = useState(false);
 
-  // Derived state
-  const myPendingReviews = assignments.filter(a => a.reviewerId === currentUser?.id && a.status === EvaluationStatus.PENDING);
+  // Derived State for Current Org
+  const currentOrg = useMemo(() => 
+    orgs.find(o => o.id === currentUser?.organizationId), 
+    [orgs, currentUser]
+  );
   
-  // Handlers
-  const handleLogin = (username: string, password: string) => {
-    const user = users.find(u => u.username === username && (u.password === password || (!u.password && password === '123456')));
+  const orgUsers = useMemo(() => 
+    users.filter(u => u.organizationId === currentUser?.organizationId),
+    [users, currentUser]
+  );
+  
+  const orgAssignments = useMemo(() => 
+    assignments.filter(a => a.organizationId === currentUser?.organizationId),
+    [assignments, currentUser]
+  );
+  
+  const orgQuestions = useMemo(() => 
+    questions.filter(q => !q.organizationId || q.organizationId === currentUser?.organizationId),
+    [questions, currentUser]
+  );
+  
+  const activeCycle = useMemo(() => {
+    if (!currentUser) return null;
+    return cycles.find(c => c.organizationId === currentUser.organizationId && c.status === 'ACTIVE')
+       || ({ id: 'dummy', organizationId: currentUser.organizationId, name: 'Default Cycle', status: 'ACTIVE', dueDate: '' } as ReviewCycle);
+  }, [cycles, currentUser]);
+
+  // Actions
+  const handleLogin = (orgCodeInput: string, u: string, p: string) => {
+    // Add trim() to handle copy-paste whitespace issues
+    const cleanInput = orgCodeInput.trim();
+    const cleanUser = u.trim();
+    const cleanPass = p.trim();
+
+    // Support Login by Code OR Name (Case Insensitive Match for Name)
+    const org = orgs.find(o => 
+      o.code === cleanInput || 
+      o.name.toLowerCase() === cleanInput.toLowerCase()
+    );
+
+    if (!org) { alert("企业代码或名称不存在"); return; }
     
+    const user = users.find(user => user.organizationId === org.id && user.username === cleanUser && user.password === cleanPass);
     if (user) {
       setCurrentUser(user);
       setActiveTab('dashboard');
-      setLoginError(null);
     } else {
-      setLoginError('用户名或密码错误。');
+      alert("用户名或密码错误");
     }
   };
 
-  const handleChangePassword = (oldPwd: string, newPwd: string) => {
-    if (!currentUser) return;
+  const handleRegister = (orgName: string, orgCode: string, adminName: string, adminUser: string, adminPass: string) => {
+    // Basic Validation
+    if (orgs.some(o => o.code === orgCode)) {
+      alert("该企业代码已被使用，请尝试其他代码。");
+      return;
+    }
+
+    const newOrgId = `org-${Date.now()}`;
+    const recoveryKey = generateRecoveryKey();
     
-    // Check old password
-    const currentActualPwd = currentUser.password || '123456';
-    if (oldPwd !== currentActualPwd) {
-        alert("旧密码错误！");
-        return;
-    }
+    const newOrg: Organization = {
+      id: newOrgId,
+      name: orgName,
+      code: orgCode,
+      recoveryKey: recoveryKey,
+      createdAt: new Date().toISOString()
+    };
+    
+    const newAdmin: User = {
+      id: `u-${Date.now()}`,
+      organizationId: newOrgId,
+      name: adminName,
+      username: adminUser,
+      password: adminPass,
+      email: `${adminUser}@${orgCode}.com`,
+      role: UserRole.ADMIN,
+      department: 'Management',
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${adminUser}`
+    };
 
-    const updatedUser = { ...currentUser, password: newPwd };
-    setUsers(users.map(u => u.id === currentUser.id ? updatedUser : u));
-    setCurrentUser(updatedUser);
-    setChangePasswordOpen(false);
-    alert("密码修改成功！下次登录请使用新密码。");
-  };
+    const newCycle: ReviewCycle = {
+      id: `c-${Date.now()}`,
+      organizationId: newOrgId,
+      name: `${new Date().getFullYear()} Q1 Review`,
+      status: 'ACTIVE',
+      dueDate: '2025-12-31'
+    };
 
-  const handleSubmitReview = (assignmentId: string, scores: Record<string, number>, comments: Record<string, string>, feedbackStrengths: string, feedbackImprovements: string) => {
-    setAssignments(prev => prev.map(a => 
-      a.id === assignmentId 
-        ? { ...a, status: EvaluationStatus.SUBMITTED, scores, comments, feedbackStrengths, feedbackImprovements, submittedAt: new Date().toISOString() } 
-        : a
-    ));
+    setOrgs(prev => [...prev, newOrg]);
+    setUsers(prev => [...prev, newAdmin]);
+    setCycles(prev => [...prev, newCycle]);
+    
+    alert(`注册成功！\n\n企业名称: ${orgName}\n登录代码: ${orgCode}\n恢复密钥: ${recoveryKey}\n\n请截图保存。`);
+    setCurrentUser(newAdmin);
     setActiveTab('dashboard');
   };
 
-  const toggleReportSharing = (subjectId: string) => {
-    const newSet = new Set(sharedReports);
-    if (newSet.has(subjectId)) {
-        newSet.delete(subjectId);
-    } else {
-        newSet.add(subjectId);
+  const handleRecover = (orgCode: string, recoveryKey: string, newPass: string) => {
+    const org = orgs.find(o => o.code === orgCode.trim());
+    if (!org) { alert("企业代码不存在"); return; }
+    
+    if (org.recoveryKey !== recoveryKey.trim()) {
+        alert("恢复密钥错误！");
+        return;
     }
-    setSharedReports(newSet);
+
+    const adminUser = users.find(u => u.organizationId === org.id && u.role === UserRole.ADMIN);
+    if (!adminUser) {
+        alert("未找到该企业的管理员账户，请联系平台支持。");
+        return;
+    }
+
+    // Reset Password
+    setUsers(prev => prev.map(u => u.id === adminUser.id ? { ...u, password: newPass } : u));
+    alert(`恢复成功！\n\n管理员用户名: ${adminUser.username}\n新密码: 已设置\n\n请使用新凭证登录。`);
   };
 
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveTab('dashboard');
+  };
+
+  const handleSubmitReview = (assignmentId: string, scores: any, comments: any, strengths: string, improvements: string) => {
+    setAssignments(prev => prev.map(a => 
+      a.id === assignmentId 
+        ? { 
+            ...a, 
+            status: EvaluationStatus.SUBMITTED, 
+            scores, 
+            comments, 
+            feedbackStrengths: strengths, 
+            feedbackImprovements: improvements, 
+            submittedAt: new Date().toISOString() 
+          } 
+        : a
+    ));
+  };
+
+  const handleChangePassword = (oldP: string, newP: string) => {
+     if (!currentUser) return;
+     if(currentUser.password !== oldP) {
+        alert("旧密码错误");
+        return;
+     }
+     setUsers(users.map(u => u.id === currentUser.id ? { ...u, password: newP } : u));
+     setCurrentUser({ ...currentUser, password: newP });
+     setChangePasswordOpen(false);
+     alert("密码修改成功");
+  };
+
+  // Render Logic
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} error={loginError} />;
+    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} onRecover={handleRecover} error={null} />;
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col md:flex-row font-sans text-slate-900">
-      
+    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
       {/* Sidebar Navigation */}
-      <aside className="w-full md:w-64 bg-slate-50 border-r border-slate-200 flex-shrink-0 flex flex-col h-screen sticky top-0">
-        <div className="p-6 flex items-center space-x-2 border-b border-slate-200">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <span className="font-bold text-lg text-white">N</span>
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-10 transition-all">
+        <div className="h-16 flex items-center px-6 border-b border-slate-100">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-blue-200">
+            <span className="font-bold text-white">N</span>
           </div>
-          <span className="text-xl font-bold tracking-tight text-slate-800">Nexus360</span>
+          <div className="flex flex-col justify-center">
+             <span className="font-bold text-lg tracking-tight text-slate-800 leading-none">Nexus360</span>
+             {currentOrg && <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-1 truncate max-w-[140px]">{currentOrg.name}</span>}
+          </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Icons.Dashboard />}>
-            工作台 (Dashboard)
-          </NavButton>
-          <NavButton active={activeTab === 'my-reviews'} onClick={() => setActiveTab('my-reviews')} icon={<Icons.List />}>
-            我的待办 (Reviews)
-            {myPendingReviews.length > 0 && <span className="ml-auto bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">{myPendingReviews.length}</span>}
-          </NavButton>
+        <div className="flex-1 overflow-y-auto py-6 px-3 space-y-1">
+          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<Icons.Dashboard />}>仪表盘</NavButton>
+          <NavButton active={activeTab === 'my-reviews'} onClick={() => setActiveTab('my-reviews')} icon={<Icons.List />}>我的评估</NavButton>
           {(currentUser.role === UserRole.MANAGER || currentUser.role === UserRole.ADMIN) && (
-             <NavButton active={activeTab === 'team-reports'} onClick={() => setActiveTab('team-reports')} icon={<Icons.Chart />}>
-              团队报告 (Reports)
-            </NavButton>
+             <NavButton active={activeTab === 'team-reports'} onClick={() => setActiveTab('team-reports')} icon={<Icons.Chart />}>团队报告</NavButton>
           )}
           {currentUser.role === UserRole.ADMIN && (
-             <NavButton active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<Icons.Settings />}>
-              管理后台 (Admin)
-            </NavButton>
+             <NavButton active={activeTab === 'admin'} onClick={() => setActiveTab('admin')} icon={<Icons.Settings />}>系统管理</NavButton>
           )}
-        </nav>
+        </div>
 
-        <div className="p-4 border-t border-slate-200 bg-white">
-          <div className="flex items-center space-x-3 mb-3">
-            <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-9 h-9 rounded-full border border-slate-200 bg-slate-100" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-800 truncate">{currentUser.name}</p>
-              <p className="text-xs text-slate-500 truncate capitalize">{currentUser.role === 'ADMIN' ? '管理员' : currentUser.role === 'MANAGER' ? '经理' : '员工'}</p>
-            </div>
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center mb-4">
+             <img src={currentUser.avatarUrl} alt="avatar" className="w-8 h-8 rounded-full bg-slate-200" />
+             <div className="ml-3 overflow-hidden">
+                <p className="text-sm font-medium text-slate-700 truncate">{currentUser.name}</p>
+                <p className="text-xs text-slate-500 truncate">{currentUser.role}</p>
+             </div>
           </div>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setChangePasswordOpen(true)} 
-              className="flex-1 flex items-center justify-center py-1.5 border border-slate-200 rounded text-xs text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors"
-              title="修改密码"
-            >
-               <Icons.Key /> <span className="ml-1">改密</span>
-            </button>
-            <button 
-              onClick={() => setCurrentUser(null)} 
-              className="flex-1 flex items-center justify-center py-1.5 border border-slate-200 rounded text-xs text-slate-600 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors"
-              title="退出登录"
-            >
-              退出
-            </button>
+          <div className="space-y-1">
+             <button onClick={() => setChangePasswordOpen(true)} className="w-full text-left text-xs text-slate-500 hover:text-blue-600 px-1 py-1 flex items-center transition-colors"><Icons.Key /><span className="ml-2">修改密码</span></button>
+             <button onClick={handleLogout} className="w-full text-left text-xs text-slate-500 hover:text-red-600 px-1 py-1 flex items-center transition-colors"><svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>退出登录</button>
           </div>
         </div>
-      </aside>
+      </div>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-white">
-        <header className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-900">
-              {activeTab === 'dashboard' && '工作概览'}
-              {activeTab === 'my-reviews' && '绩效评估'}
-              {activeTab === 'team-reports' && '团队数据分析'}
-              {activeTab === 'admin' && '系统管理'}
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">
-              当前周期: <span className="font-medium text-slate-700">{activeCycle.name}</span>
-            </p>
-          </div>
-          <div className="hidden md:block">
-            <Badge color="green">系统运行中</Badge>
-          </div>
-        </header>
+      {/* Main Content Area */}
+      <div className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
+         <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {activeTab === 'dashboard' && <Dashboard user={currentUser} users={orgUsers} assignments={orgAssignments} setTab={setActiveTab} />}
+            {activeTab === 'my-reviews' && <MyReviewsList user={currentUser} users={orgUsers} assignments={orgAssignments} questions={orgQuestions} onSubmit={handleSubmitReview} />}
+            {activeTab === 'team-reports' && <TeamReports user={currentUser} users={orgUsers} assignments={orgAssignments} questions={orgQuestions} />}
+            {activeTab === 'admin' && currentUser.role === UserRole.ADMIN && activeCycle && (
+               <AdminConsole 
+                 users={orgUsers} 
+                 setUsers={(newOrgUsers) => {
+                    setUsers(prev => {
+                       const others = prev.filter(u => u.organizationId !== currentUser.organizationId);
+                       return [...others, ...newOrgUsers];
+                    });
+                 }}
+                 questions={orgQuestions}
+                 setQuestions={(newQs) => {
+                    setQuestions(prev => {
+                       // Replace logic for mock: remove all org specific questions, add new ones.
+                       const currentIds = new Set(orgQuestions.map(q => q.id));
+                       const others = prev.filter(q => !currentIds.has(q.id));
+                       return [...others, ...newQs];
+                    });
+                 }}
+                 assignments={orgAssignments}
+                 setAssignments={(newAs) => {
+                    setAssignments(prev => {
+                       const others = prev.filter(a => a.organizationId !== currentUser.organizationId);
+                       return [...others, ...newAs];
+                    });
+                 }}
+                 cycle={activeCycle}
+                 setCycle={(updatedCycle) => {
+                    setCycles(prev => prev.map(c => c.id === updatedCycle.id ? updatedCycle : c));
+                 }}
+                 currentUser={currentUser}
+                 orgId={currentUser.organizationId}
+               />
+            )}
+         </div>
+      </div>
 
-        {activeTab === 'dashboard' && <Dashboard user={currentUser} users={users} assignments={assignments} setTab={setActiveTab} />}
-        {activeTab === 'my-reviews' && <MyReviewsList user={currentUser} users={users} assignments={assignments} questions={questions} onSubmit={handleSubmitReview} />}
-        {activeTab === 'team-reports' && <TeamReports user={currentUser} users={users} assignments={assignments} questions={questions} sharedReports={sharedReports} onToggleShare={toggleReportSharing} />}
-        {activeTab === 'admin' && (
-          <AdminConsole 
-            users={users} 
-            setUsers={setUsers}
-            questions={questions} 
-            setQuestions={setQuestions}
-            assignments={assignments}
-            setAssignments={setAssignments}
-            cycle={activeCycle}
-            setCycle={setActiveCycle}
-            currentUser={currentUser}
-          />
-        )}
-      </main>
-
-      {/* Change Password Modal */}
-      <ChangePasswordModal 
-        isOpen={isChangePasswordOpen}
-        onClose={() => setChangePasswordOpen(false)}
-        onSave={handleChangePassword}
-      />
+      <ChangePasswordModal isOpen={isChangePasswordOpen} onClose={() => setChangePasswordOpen(false)} onSave={handleChangePassword} />
     </div>
   );
-}
+};
+
+export default App;
